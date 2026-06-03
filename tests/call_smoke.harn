@@ -1,0 +1,169 @@
+import { call } from "../src/lib"
+
+@complexity(allow)
+pipeline default() {
+  egress_policy({allow: ["bk-api.test", "graphql.bk.test", "gh-api.test"], default: "deny"})
+  http_mock_clear()
+  let base = "https://bk-api.test/v2"
+  let token = "buildkite-api-token"
+  let org = "acme"
+  let pipeline_slug = "web"
+  // build.get returns the jobs array the webhook omits.
+  http_mock(
+    "GET",
+    base + "/organizations/acme/pipelines/web/builds/43",
+    {
+      status: 200,
+      body: "{\"number\":43,\"state\":\"failed\",\"jobs\":[{\"id\":\"j1\",\"exit_status\":1}]}",
+    },
+  )
+  let build = call(
+    "build.get",
+    {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
+  )
+  assert_eq(build.number, 43, "build.get number")
+  assert_eq(build.jobs[0].id, "j1", "build.get jobs array")
+  // job.retry (mutating) -> PUT .../jobs/{job_id}/retry.
+  http_mock(
+    "PUT",
+    base + "/organizations/acme/pipelines/web/builds/43/jobs/j1/retry",
+    {status: 200, body: "{\"id\":\"j2\",\"state\":\"scheduled\"}"},
+  )
+  let retried = call(
+    "job.retry",
+    {
+      api_base_url: base,
+      api_token: token,
+      build_number: 43,
+      job_id: "j1",
+      org: org,
+      pipeline: pipeline_slug,
+    },
+  )
+  assert_eq(retried.id, "j2", "job.retry returns new job id")
+  // build.rebuild (mutating).
+  http_mock(
+    "PUT",
+    base + "/organizations/acme/pipelines/web/builds/43/rebuild",
+    {status: 201, body: "{\"number\":44,\"state\":\"scheduled\"}"},
+  )
+  let rebuilt = call(
+    "build.rebuild",
+    {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
+  )
+  assert_eq(rebuilt.number, 44, "build.rebuild new build")
+  // build.cancel (mutating).
+  http_mock(
+    "PUT",
+    base + "/organizations/acme/pipelines/web/builds/43/cancel",
+    {status: 200, body: "{\"number\":43,\"state\":\"canceling\"}"},
+  )
+  call(
+    "build.cancel",
+    {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
+  )
+  // job.log returns plain text -> surfaced verbatim in `body`.
+  http_mock(
+    "GET",
+    base + "/organizations/acme/pipelines/web/builds/43/jobs/j1/log",
+    {status: 200, body: "+ make test\nFAILED", headers: {"content-type": "text/plain"}},
+  )
+  let log = call(
+    "job.log",
+    {
+      api_base_url: base,
+      api_token: token,
+      build_number: 43,
+      job_id: "j1",
+      org: org,
+      pipeline: pipeline_slug,
+    },
+  )
+  assert(contains(log.body, "FAILED"), "job.log surfaces plain text")
+  // job.unblock (mutating).
+  http_mock(
+    "PUT",
+    base + "/organizations/acme/pipelines/web/builds/43/jobs/jb/unblock",
+    {status: 200, body: "{\"id\":\"jb\",\"state\":\"unblocked\"}"},
+  )
+  call(
+    "job.unblock",
+    {
+      api_base_url: base,
+      api_token: token,
+      build_number: 43,
+      job_id: "jb",
+      org: org,
+      pipeline: pipeline_slug,
+    },
+  )
+  // raw api.request escape hatch.
+  http_mock(
+    "GET",
+    base + "/organizations/acme/pipelines",
+    {status: 200, body: "[{\"slug\":\"web\"}]"},
+  )
+  let raw = call(
+    "api.request",
+    {api_base_url: base, api_token: token, method: "GET", path: "/organizations/acme/pipelines"},
+  )
+  assert_eq(raw[0].slug, "web", "api.request raw passthrough")
+  // GraphQL helper.
+  http_mock(
+    "POST",
+    "https://graphql.bk.test/v1",
+    {status: 200, body: "{\"data\":{\"viewer\":{\"user\":{\"name\":\"Ada\"}}}}"},
+  )
+  let gql = call(
+    "graphql",
+    {
+      api_token: token,
+      graphql_url: "https://graphql.bk.test/v1",
+      query: "query { viewer { user { name } } }",
+    },
+  )
+  assert_eq(gql.data.viewer.user.name, "Ada", "graphql viewer")
+  // github_commit_pulls resolves PR by SHA.
+  http_mock(
+    "GET",
+    "https://gh-api.test/repos/acme/web/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/pulls",
+    {status: 200, body: "[{\"number\":137,\"state\":\"open\"}]"},
+  )
+  let pulls = call(
+    "github_commit_pulls",
+    {
+      github_api_base_url: "https://gh-api.test",
+      github_token: "gh-token",
+      owner: "acme",
+      repo: "web",
+      sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    },
+  )
+  assert_eq(pulls[0].number, 137, "github_commit_pulls resolves pr")
+  // Missing api_token rejects.
+  let missing = call("build.get", {api_base_url: base, build_number: 43, org: org, pipeline: pipeline_slug})
+  assert(is_err(missing), "missing api token rejects")
+  assert_eq(unwrap_err(missing).code, "missing_token", "missing token code")
+  // Unsupported method rejects.
+  let unsupported = call("build.lock", {api_base_url: base, api_token: token})
+  assert(is_err(unsupported), "unsupported method rejected")
+  assert_eq(unwrap_err(unsupported).code, "method_not_found", "unsupported method code")
+  // Rate-limit cap: reset > 60s away -> rate_limited error.
+  http_mock_clear()
+  http_mock(
+    "GET",
+    base + "/organizations/acme/pipelines/web/builds/43",
+    {
+      status: 429,
+      body: "{\"message\":\"rate limited\"}",
+      headers: {"ratelimit-remaining": "0", "ratelimit-reset": to_string(to_int(harness.clock.timestamp()) + 120)},
+    },
+  )
+  let capped = call(
+    "build.get",
+    {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
+  )
+  assert(is_err(capped), "rate-limit cap rejects")
+  assert_eq(unwrap_err(capped).code, "rate_limited", "rate-limit cap code")
+  http_mock_clear()
+}

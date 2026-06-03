@@ -1,0 +1,30 @@
+{
+  "event": "job.finished",
+  "job": {
+    "id": "j5555555-5555-5555-5555-555555555555",
+    "type": "script",
+    "name": "tests",
+    "state": "finished",
+    "exit_status": 1,
+    "log_url": "https://api.buildkite.com/v2/organizations/acme/pipelines/web/builds/43/jobs/j5555555-5555-5555-5555-555555555555/log",
+    "web_url": "https://buildkite.com/acme/web/builds/43#j5555555",
+    "started_at": "2026-06-02T11:00:10.000Z",
+    "finished_at": "2026-06-02T11:04:05.000Z"
+  },
+  "build": {
+    "id": "b4444444-4444-4444-4444-444444444444",
+    "number": 43,
+    "state": "failed",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "branch": "feature/login",
+    "web_url": "https://buildkite.com/acme/web/builds/43"
+  },
+  "pipeline": {
+    "id": "p2222222-2222-2222-2222-222222222222",
+    "name": "web",
+    "slug": "web",
+    "repository": "git@github.com:acme/web.git",
+    "provider": {"id": "github", "settings": {"account": "acme"}}
+  },
+  "sender": {"id": "u3333333", "name": "Ada Lovelace"}
+}

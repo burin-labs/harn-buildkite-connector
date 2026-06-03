@@ -1,0 +1,83 @@
+import {
+  activate,
+  call,
+  init,
+  kinds,
+  methods,
+  normalize_inbound,
+  payload_schema,
+  provider_id,
+  shutdown,
+} from "../src/lib"
+
+/** Read a fixture JSON body from the test fixtures directory. */
+pub fn fixture_body(name) {
+  return harness.fs.read_text(source_dir() + "/fixtures/webhooks/" + name + ".json")
+}
+
+/**
+ * Compute the Buildkite webhook signature header value for a body.
+ *
+ * The signed message is `"<timestamp>.<raw_body>"`, HMAC-SHA256 keyed by the
+ * webhook token. Mirrors `__verify_signature` in src/lib.harn.
+ */
+pub fn sign(token, body, timestamp) {
+  let signature = hmac_sha256(to_string(token), to_string(timestamp) + "." + body)
+  return "timestamp=" + to_string(timestamp) + ",signature=" + signature
+}
+
+/** Current unix timestamp as an integer (within the freshness window). */
+pub fn now_ts() {
+  return to_int(harness.clock.timestamp())
+}
+
+/** Build a raw inbound envelope signed with the X-Buildkite-Signature scheme. */
+pub fn signed_raw(token, body, event, timestamp = nil) {
+  let ts = timestamp ?? now_ts()
+  return {
+    body_text: body,
+    headers: {"x-buildkite-event": event, "x-buildkite-signature": sign(token, body, ts)},
+  }
+}
+
+/** Build a raw inbound envelope using the simpler X-Buildkite-Token scheme. */
+pub fn token_raw(token, body, event) {
+  return {body_text: body, headers: {"x-buildkite-event": event, "x-buildkite-token": token}}
+}
+
+/** Build a signed raw inbound envelope from a named fixture. */
+pub fn fixture_raw(name, token, event, timestamp = nil) {
+  return signed_raw(token, fixture_body(name), event, timestamp)
+}
+
+pub fn assert_buildkite_interface() {
+  shutdown()
+  assert_eq(provider_id(), "buildkite", "provider id")
+  assert_eq(kinds()[0], "webhook", "webhook kind")
+  assert_eq(payload_schema().harn_schema_name, "BuildkiteEventPayload", "payload schema name")
+  let mutate = __method_meta(methods(), "job.retry")
+  assert(mutate.requires_approval, "job.retry requires approval")
+  let read = __method_meta(methods(), "build.get")
+  assert(!read.requires_approval, "build.get does not require approval")
+  let initialized = init({webhook_token: "test-secret"})
+  assert(initialized.initialized, "init stores state")
+  let activated = activate([{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}])
+  assert_eq(activated.bindings, 1, "activate counts bindings")
+}
+
+fn __method_meta(method_list, name) {
+  for entry in method_list {
+    if entry.name == name {
+      return entry
+    }
+  }
+  return {name: name, requires_approval: false}
+}
+
+pub fn buildkite_call(method, args) {
+  return call(method, args)
+}
+
+pub fn buildkite_normalize(raw) {
+  return normalize_inbound(raw)
+}
