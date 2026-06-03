@@ -1,0 +1,102 @@
+import { init, shutdown } from "../src/lib"
+import {
+  assert_buildkite_interface,
+  buildkite_normalize,
+  fixture_body,
+  fixture_raw,
+  now_ts,
+  sign,
+  token_raw,
+} from "./helpers"
+
+@complexity(allow)
+pipeline default() {
+  let token = "test-webhook-token"
+  assert_buildkite_interface()
+  shutdown()
+  init({webhook_token: token})
+  let body = fixture_body("build_failed")
+  // Valid signature passes.
+  let ok = buildkite_normalize(fixture_raw("build_failed", token, "build.finished"))
+  assert_eq(ok.type, "event", "valid signature accepted")
+  assert_eq(ok.event.signature_status, "signed", "valid signature status")
+  // Tampered body -> signature no longer matches -> rejected 401.
+  let ts = now_ts()
+  let tampered_body = replace(body, "feature/login", "main")
+  let tampered = buildkite_normalize(
+    {
+      body_text: tampered_body,
+      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, body, ts)},
+    },
+  )
+  assert_eq(tampered.type, "reject", "tampered body rejected")
+  assert_eq(tampered.reject.status, 401, "tampered 401")
+  // Wrong token -> signature mismatch -> rejected.
+  let wrong = buildkite_normalize(
+    {
+      body_text: body,
+      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign("wrong-token", body, ts)},
+    },
+  )
+  assert_eq(wrong.type, "reject", "wrong token rejected")
+  assert_eq(wrong.reject.status, 401, "wrong token 401")
+  // Stale timestamp (outside the 5-minute window) -> rejected even with a valid HMAC.
+  let stale_ts = now_ts() - 600
+  let stale = buildkite_normalize(
+    {
+      body_text: body,
+      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, body, stale_ts)},
+    },
+  )
+  assert_eq(stale.type, "reject", "stale signature rejected")
+  assert_eq(stale.reject.status, 401, "stale 401")
+  // Fail closed: no token configured -> rejected.
+  shutdown()
+  let unset = buildkite_normalize(fixture_raw("build_failed", "test-webhook-token", "build.finished"))
+  assert_eq(unset.type, "reject", "missing token fails closed")
+  assert_eq(unset.reject.status, 401, "missing token 401")
+  // Plain X-Buildkite-Token mode works as a simpler fallback.
+  init({webhook_token: token})
+  let plain = buildkite_normalize(token_raw(token, body, "build.finished"))
+  assert_eq(plain.type, "event", "plain token accepted")
+  assert_eq(plain.event.signature_status, "token", "plain token signature status")
+  let plain_wrong = buildkite_normalize(token_raw("nope", body, "build.finished"))
+  assert_eq(plain_wrong.type, "reject", "plain wrong token rejected")
+  assert_eq(plain_wrong.reject.status, 401, "plain wrong token 401")
+  // Ping is acknowledged (200), not normalized into an event.
+  let ping = buildkite_normalize(
+    {
+      body_text: "{\"event\":\"ping\"}",
+      headers: {
+        "x-buildkite-event": "ping",
+        "x-buildkite-signature": sign(token, "{\"event\":\"ping\"}", now_ts()),
+      },
+    },
+  )
+  assert_eq(ping.type, "reject", "ping acknowledged as non-event")
+  assert_eq(ping.reject.status, 200, "ping 200")
+  // Invalid JSON (after a valid signature) -> 400.
+  let bad_json = "{not json"
+  let invalid = buildkite_normalize(
+    {
+      body_text: bad_json,
+      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, bad_json, now_ts())},
+    },
+  )
+  assert_eq(invalid.type, "reject", "invalid json rejected")
+  assert_eq(invalid.reject.status, 400, "invalid json 400")
+  // Unsupported event -> 400.
+  let unsupported_body = "{\"event\":\"agent.connected\"}"
+  let unsupported = buildkite_normalize(
+    {
+      body_text: unsupported_body,
+      headers: {
+        "x-buildkite-event": "agent.connected",
+        "x-buildkite-signature": sign(token, unsupported_body, now_ts()),
+      },
+    },
+  )
+  assert_eq(unsupported.type, "reject", "unsupported event rejected")
+  assert_eq(unsupported.reject.status, 400, "unsupported event 400")
+  shutdown()
+}
