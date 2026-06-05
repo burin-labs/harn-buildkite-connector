@@ -19,7 +19,8 @@ pipeline default() {
   // Valid signature passes.
   let ok = buildkite_normalize(fixture_raw("build_failed", token, "build.finished"))
   assert_eq(ok.type, "event", "valid signature accepted")
-  assert_eq(ok.event.signature_status, "signed", "valid signature status")
+  assert_eq(ok.event.signature_status.state, "verified", "valid signature status")
+  assert_eq(ok.event.signature_status.method, "signature", "valid signature method")
   // Tampered body -> signature no longer matches -> rejected 401.
   let ts = now_ts()
   let tampered_body = replace(body, "feature/login", "main")
@@ -59,7 +60,8 @@ pipeline default() {
   init({webhook_token: token})
   let plain = buildkite_normalize(token_raw(token, body, "build.finished"))
   assert_eq(plain.type, "event", "plain token accepted")
-  assert_eq(plain.event.signature_status, "token", "plain token signature status")
+  assert_eq(plain.event.signature_status.state, "verified", "plain token signature status")
+  assert_eq(plain.event.signature_status.method, "token", "plain token signature method")
   let plain_wrong = buildkite_normalize(token_raw("nope", body, "build.finished"))
   assert_eq(plain_wrong.type, "reject", "plain wrong token rejected")
   assert_eq(plain_wrong.reject.status, 401, "plain wrong token 401")

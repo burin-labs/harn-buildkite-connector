@@ -380,7 +380,7 @@ fn __verify_webhook(raw, headers, body_text) {
   }
   let signature_header = __header(headers, "x-buildkite-signature")
   if signature_header != nil && signature_header != "" {
-    return __verify_signature(signature_header, body_text, to_string(token))
+    return __verify_signature(raw, signature_header, body_text, to_string(token))
   }
   let provided_token = __header(headers, "x-buildkite-token")
   if provided_token == nil || provided_token == "" {
@@ -393,7 +393,7 @@ fn __verify_webhook(raw, headers, body_text) {
 }
 
 @complexity(allow)
-fn __verify_signature(signature_header, body_text, token) {
+fn __verify_signature(raw, signature_header, body_text, token) {
   let fields = __parse_signature_header(signature_header)
   let timestamp = fields.get("timestamp")
   let signature = fields.get("signature")
@@ -412,7 +412,7 @@ fn __verify_signature(signature_header, body_text, token) {
   if is_err(parsed_ts) {
     return __err("invalid_signature", "x-buildkite-signature timestamp is not an integer")
   }
-  let now = to_int(harness.clock.timestamp())
+  let now = __verification_timestamp(raw)
   let age = now - unwrap(parsed_ts)
   if age > SIGNATURE_MAX_AGE_SECONDS || age < -SIGNATURE_MAX_AGE_SECONDS {
     return __err(
@@ -422,6 +422,19 @@ fn __verify_signature(signature_header, body_text, token) {
     )
   }
   return Ok("signed")
+}
+
+fn __verification_timestamp(raw) {
+  let received_at = raw?.received_at
+  if received_at != nil && trim(to_string(received_at)) != "" {
+    let parsed = try {
+      date_parse(to_string(received_at))
+    }
+    if !is_err(parsed) {
+      return to_int(unwrap(parsed))
+    }
+  }
+  return to_int(harness.clock.timestamp())
 }
 
 fn __parse_signature_header(header) {
@@ -466,12 +479,22 @@ fn __build_event(event, payload, raw, headers, signature_status) {
   }
   return {
     dedupe_key: __dedupe_key(event, pipeline_slug, build),
-    headers: {"x-buildkite-event": __header(headers, "x-buildkite-event"), "x-buildkite-token": nil},
+    headers: {"x-buildkite-event": __header(headers, "x-buildkite-event")},
     kind: __event_kind(event, build, job),
     occurred_at: __occurred_at(build, job, raw),
     payload: normalized_payload,
-    signature_status: signature_status,
+    signature_status: __signature_status(signature_status),
   }
+}
+
+fn __signature_status(status) {
+  if status == "signed" {
+    return {method: "signature", state: "verified"}
+  }
+  if status == "token" {
+    return {method: "token", state: "verified"}
+  }
+  return {state: "unsigned"}
 }
 
 fn __event_kind(event, build, job) {
