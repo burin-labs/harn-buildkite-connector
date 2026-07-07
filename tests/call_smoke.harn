@@ -4,10 +4,10 @@ import { call } from "../src/lib"
 pipeline default() {
   egress_policy({allow: ["bk-api.test", "graphql.bk.test", "gh-api.test"], default: "deny"})
   http_mock_clear()
-  let base = "https://bk-api.test/v2"
-  let token = "buildkite-api-token"
-  let org = "acme"
-  let pipeline_slug = "web"
+  const base = "https://bk-api.test/v2"
+  const token = "buildkite-api-token"
+  const org = "acme"
+  const pipeline_slug = "web"
   // build.get returns the jobs array the webhook omits.
   http_mock(
     "GET",
@@ -17,7 +17,7 @@ pipeline default() {
       body: "{\"number\":43,\"state\":\"failed\",\"jobs\":[{\"id\":\"j1\",\"exit_status\":1}]}",
     },
   )
-  let build = call(
+  const build = call(
     "build.get",
     {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
   )
@@ -29,7 +29,7 @@ pipeline default() {
     base + "/organizations/acme/pipelines/web/builds/43/jobs/j1/retry",
     {status: 200, body: "{\"id\":\"j2\",\"state\":\"scheduled\"}"},
   )
-  let retried = call(
+  const retried = call(
     "job.retry",
     {
       api_base_url: base,
@@ -47,7 +47,7 @@ pipeline default() {
     base + "/organizations/acme/pipelines/web/builds/43/rebuild",
     {status: 201, body: "{\"number\":44,\"state\":\"scheduled\"}"},
   )
-  let rebuilt = call(
+  const rebuilt = call(
     "build.rebuild",
     {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
   )
@@ -68,7 +68,7 @@ pipeline default() {
     base + "/organizations/acme/pipelines/web/builds/43/jobs/j1/log",
     {status: 200, body: "+ make test\nFAILED", headers: {"content-type": "text/plain"}},
   )
-  let log = call(
+  const log = call(
     "job.log",
     {
       api_base_url: base,
@@ -103,7 +103,7 @@ pipeline default() {
     base + "/organizations/acme/pipelines",
     {status: 200, body: "[{\"slug\":\"web\"}]"},
   )
-  let raw = call(
+  const raw = call(
     "api.request",
     {api_base_url: base, api_token: token, method: "GET", path: "/organizations/acme/pipelines"},
   )
@@ -114,7 +114,7 @@ pipeline default() {
     "https://graphql.bk.test/v1",
     {status: 200, body: "{\"data\":{\"viewer\":{\"user\":{\"name\":\"Ada\"}}}}"},
   )
-  let gql = call(
+  const gql = call(
     "graphql",
     {
       api_token: token,
@@ -129,7 +129,7 @@ pipeline default() {
     "https://gh-api.test/repos/acme/web/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/pulls",
     {status: 200, body: "[{\"number\":137,\"state\":\"open\"}]"},
   )
-  let pulls = call(
+  const pulls = call(
     "github_commit_pulls",
     {
       github_api_base_url: "https://gh-api.test",
@@ -141,11 +141,11 @@ pipeline default() {
   )
   assert_eq(pulls[0].number, 137, "github_commit_pulls resolves pr")
   // Missing api_token rejects.
-  let missing = call("build.get", {api_base_url: base, build_number: 43, org: org, pipeline: pipeline_slug})
+  const missing = call("build.get", {api_base_url: base, build_number: 43, org: org, pipeline: pipeline_slug})
   assert(is_err(missing), "missing api token rejects")
   assert_eq(unwrap_err(missing).code, "missing_token", "missing token code")
   // Unsupported method rejects.
-  let unsupported = call("build.lock", {api_base_url: base, api_token: token})
+  const unsupported = call("build.lock", {api_base_url: base, api_token: token})
   assert(is_err(unsupported), "unsupported method rejected")
   assert_eq(unwrap_err(unsupported).code, "method_not_found", "unsupported method code")
   // Rate-limit cap: reset > 60s away -> rate_limited error.
@@ -159,7 +159,7 @@ pipeline default() {
       headers: {"ratelimit-remaining": "0", "ratelimit-reset": to_string(to_int(harness.clock.timestamp()) + 120)},
     },
   )
-  let capped = call(
+  const capped = call(
     "build.get",
     {api_base_url: base, api_token: token, build_number: 43, org: org, pipeline: pipeline_slug},
   )

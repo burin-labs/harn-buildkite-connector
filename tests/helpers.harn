@@ -22,7 +22,7 @@ pub fn fixture_body(name) {
  * webhook token. Mirrors `__verify_signature` in src/lib.harn.
  */
 pub fn sign(token, body, timestamp) {
-  let signature = hmac_sha256(to_string(token), to_string(timestamp) + "." + body)
+  const signature = hmac_sha256(to_string(token), to_string(timestamp) + "." + body)
   return "timestamp=" + to_string(timestamp) + ",signature=" + signature
 }
 
@@ -33,7 +33,7 @@ pub fn now_ts() {
 
 /** Build a raw inbound envelope signed with the X-Buildkite-Signature scheme. */
 pub fn signed_raw(token, body, event, timestamp = nil) {
-  let ts = timestamp ?? now_ts()
+  const ts = timestamp ?? now_ts()
   return {
     body_text: body,
     headers: {"x-buildkite-event": event, "x-buildkite-signature": sign(token, body, ts)},
@@ -55,13 +55,13 @@ pub fn assert_buildkite_interface() {
   assert_eq(provider_id(), "buildkite", "provider id")
   assert_eq(kinds()[0], "webhook", "webhook kind")
   assert_eq(payload_schema().harn_schema_name, "BuildkiteEventPayload", "payload schema name")
-  let mutate = __method_meta(methods(), "job.retry")
+  const mutate = __method_meta(methods(), "job.retry")
   assert(mutate.requires_approval, "job.retry requires approval")
-  let read = __method_meta(methods(), "build.get")
+  const read = __method_meta(methods(), "build.get")
   assert(!read.requires_approval, "build.get does not require approval")
-  let initialized = init({webhook_token: "test-secret"})
+  const initialized = init({webhook_token: "test-secret"})
   assert(initialized.initialized, "init stores state")
-  let activated = activate([{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}])
+  const activated = activate([{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}])
   assert_eq(activated.bindings, 1, "activate counts bindings")
 }
 
