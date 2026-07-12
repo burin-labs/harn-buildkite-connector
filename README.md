@@ -21,6 +21,15 @@ let an agent diagnose the failure or rerun the build.
 
 ## Install
 
+No release tag is published yet. Use the `main` branch for package-manager
+smoke tests:
+
+```sh
+harn add github.com/burin-labs/harn-buildkite-connector@main
+```
+
+Use a path checkout for local multi-repo development:
+
 ```toml
 [dependencies]
 harn-buildkite-connector = { path = "../harn-buildkite-connector" }
