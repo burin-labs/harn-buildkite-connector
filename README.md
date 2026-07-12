@@ -6,13 +6,8 @@ orchestrator. Verifies signed inbound webhooks, normalizes Buildkite
 outbound REST / GraphQL calls so an agent can diagnose or rerun a failed
 build.
 
-> **Status: pre-alpha** — developed alongside
-> [burin-labs/harn](https://github.com/burin-labs/harn) as part of the
-> pure-Harn connectors program
-> ([epic #2951](https://github.com/burin-labs/harn/issues/2951)).
-
-This is an **inbound + outbound** connector implementing the Harn
-Connector interface.
+This is a first-party **inbound + outbound** connector package implementing
+Harn Connector Contract v1.
 
 ## User story
 
