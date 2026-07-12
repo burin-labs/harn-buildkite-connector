@@ -1,23 +1,23 @@
 # SKILL: harn-buildkite-connector
 
 Trigger recipes and outbound helpers for Buildkite via the pure-Harn
-`harn-buildkite-connector` package. Receive a webhook on CI failure,
-map it to the PR / commit / branch, then let an agent diagnose or rerun.
+`harn-buildkite-connector` package. Receive a failed-build webhook, map it to
+the pull request, commit, and branch, then let an agent diagnose or rerun it.
 
 ## What you get
 
-- **Signed webhook inbound** — HMAC-SHA256 over `"<timestamp>.<raw_body>"`
+- **Signed webhook inbound:** HMAC-SHA256 over `"<timestamp>.<raw_body>"`
   with a constant-time compare and a ~5-minute freshness window
   (replay protection). A simpler `X-Buildkite-Token` plain-compare mode
   is also supported. Fails closed when no token is configured.
-- **Normalized CI envelope** for `build.finished`, `job.finished`, and
+- **Normalized CI envelope:** `build.finished`, `job.finished`, and
   the rest of the `build.*` / `job.*` family, with `is_failure`,
   `commit_sha`, `branch`, `pr_number`, and a `rerun_handle`.
-- **REST outbound** for retrying jobs, rebuilding/canceling builds,
+- **REST outbound:** retry jobs, rebuild or cancel builds,
   fetching the build (with its jobs array), tailing job logs, and
   unblocking blocked jobs.
 - **GraphQL passthrough** and a raw `api.request` escape hatch.
-- **GitHub PR resolution** helper to map a commit SHA to its PRs when
+- **GitHub pull request resolution:** map a commit SHA to its pull requests when
   `build.pull_request` is absent.
 
 ## There is no `build.failed` event
@@ -29,7 +29,7 @@ are `scheduled`, `running`, `passed`, `failed`, `blocked`, `canceled`,
 `canceling`, `skipped`, `not_run`, `waiting`, and `waiting_failed`.
 `build.failing` is an early mid-build signal, not a terminal state.
 
-## Trigger recipe — diagnose a failed build
+## Trigger recipe: diagnose a failed build
 
 ```harn
 import buildkite_connector from "harn-buildkite-connector"
@@ -41,7 +41,7 @@ trigger ci_failure on buildkite {
   }
   on event {
     if event.payload.is_failure {
-      // Webhook `build` omits the jobs array — fetch it.
+      // Webhook `build` omits the jobs array, so fetch it first.
       let build = buildkite_connector.call("build.get", {
         org: event.payload.rerun_handle.org,
         pipeline: event.payload.pipeline_slug,
@@ -54,7 +54,7 @@ trigger ci_failure on buildkite {
 }
 ```
 
-## Trigger recipe — retry the first failed job (mutating)
+## Trigger recipe: retry the first failed job (mutating)
 
 `job.retry`, `build.rebuild`, `build.cancel`, and `job.unblock` are
 flagged `requires_approval: true` via `methods()`, so the orchestrator
@@ -96,12 +96,14 @@ let pulls = buildkite_connector.call("github_commit_pulls", {
 | Secret                          | Used for                                          |
 | ------------------------------- | ------------------------------------------------- |
 | `buildkite/webhook-token`       | Verify inbound webhooks (signature or token mode) |
-| `buildkite/api-token`           | Outbound REST + GraphQL as `Authorization: Bearer`|
+| `buildkite/api-token`           | Outbound REST and GraphQL as `Authorization: Bearer` |
 
-Scope the API token `read_builds` (for `build.get` / `job.log`) and
-`write_builds` (for retry / rebuild / cancel / unblock).
+For REST helpers, scope the API token with `read_builds` for `build.get`,
+`read_build_logs` for `job.log`, and `write_builds` for retry, rebuild, cancel,
+and unblock. GraphQL calls also require Buildkite's separate GraphQL API access
+capability; REST scopes do not limit GraphQL access.
 
-## Self-managed / custom API host
+## Custom API hosts
 
 Set `api_base_url` on each call (or `BUILDKITE_API_BASE_URL`) to target
 a non-default host; the default is `https://api.buildkite.com/v2`.

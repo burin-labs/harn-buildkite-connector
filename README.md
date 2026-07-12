@@ -11,8 +11,8 @@ Harn Connector Contract v1.
 
 ## User story
 
-Receive a webhook on CI failure → map it to the PR / commit / branch →
-let an agent diagnose the failure or rerun the build.
+Receive a failed-build webhook, map it to the PR, commit, and branch, then let
+an agent diagnose the failure or rerun the build.
 
 ## Install
 
@@ -32,7 +32,7 @@ harn-buildkite-connector = { path = "../harn-buildkite-connector" }
 
 ## Usage
 
-### Webhook trigger — diagnose a failed build
+### Webhook trigger: diagnose a failed build
 
 ```harn
 import buildkite_connector from "harn-buildkite-connector"
@@ -139,27 +139,17 @@ The REST base is `https://api.buildkite.com/v2` with
 | `buildkite/webhook-token` | Inbound webhook verification (signature/token mode) |
 | `buildkite/api-token`     | Outbound REST + GraphQL Bearer auth                 |
 
-Scope the API token `read_builds` (for `build.get` / `job.log`) and
-`write_builds` (for retry / rebuild / cancel / unblock).
+For REST helpers, scope the API token with `read_builds` for `build.get`,
+`read_build_logs` for `job.log`, and `write_builds` for retry, rebuild, cancel,
+and unblock. GraphQL calls also require Buildkite's separate GraphQL API access
+capability; REST scopes do not limit GraphQL access.
 
 ## Development
 
-Install the pinned Harn CLI:
+Run the package gate:
 
 ```sh
-cargo install harn-cli --version "$(cat .harn-version)" --locked
-harn --version
-```
-
-Run the local CI equivalent:
-
-```sh
-harn install
-harn check src
-harn lint src
-harn fmt --check src tests
-for test in tests/*.harn; do harn run "$test" || exit 1; done
-harn connector check .
+harn connector test "$(pwd)" --provider buildkite
 ```
 
 ## License

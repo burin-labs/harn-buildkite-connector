@@ -34,8 +34,8 @@ secret = "buildkite/api-token"
 [providers.setup.recovery]
 missing_auth = "Store buildkite/webhook-token (webhook signing/token) and buildkite/api-token (REST Bearer) before enabling Buildkite bindings."
 expired_credentials = "Rotate buildkite/api-token in Buildkite (Personal Settings -> API Access Tokens) and rerun Buildkite validation."
-revoked_credentials = "Replace buildkite/api-token with an active token scoped read_builds + write_builds."
-missing_scopes = "Grant the API token read_builds (for build.get / job.log) and write_builds (for retry/rebuild/cancel/unblock)."
+revoked_credentials = "Replace buildkite/api-token with an active token scoped read_builds (build.get), read_build_logs (job.log), and write_builds (retry/rebuild/cancel/unblock). Enable GraphQL API access when using graphql."
+missing_scopes = "Grant read_builds (build.get), read_build_logs (job.log), and write_builds (retry/rebuild/cancel/unblock). Enable GraphQL API access when using graphql."
 inaccessible_resource = "Confirm the token can access the target organization and pipeline."
 transient_provider_outage = "Retry after the Buildkite API and webhook endpoints are healthy."
 
