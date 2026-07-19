@@ -39,7 +39,11 @@ pipeline default() {
   )
   assert_eq(failed.event.payload.branch, "feature/login", "failed branch")
   assert_eq(failed.event.payload.pr_number, 137, "failed pr_number from build.pull_request")
-  assert_eq(failed.event.payload.build_id, "b4444444-4444-4444-4444-444444444444", "failed build id")
+  assert_eq(
+    failed.event.payload.build_id,
+    "b4444444-4444-4444-4444-444444444444",
+    "failed build id",
+  )
   assert(failed.event.payload.web_url != nil, "failed web_url present")
   // job.finished maps job details and surfaces rerun job_id.
   const job = buildkite_normalize(fixture_raw("job_failed", token, "job.finished"))

@@ -110,11 +110,15 @@ pub fn activate(bindings = []) {
   let by_id = {}
   let seen_paths = {}
   for binding in bindings ?? [] {
-    const binding_id = binding?.binding_id ?? binding?.id ?? ("binding-" + to_string(len(by_id.keys())))
+    const binding_id = binding?.binding_id ?? binding?.id
+      ?? ("binding-" + to_string(len(by_id.keys())))
     const path = binding?.path ?? binding?.match?.path
     if path != nil && path != "" {
       if seen_paths.get(path) {
-        return __err("activation", "buildkite connector path `" + path + "` is configured by multiple bindings")
+        return __err(
+          "activation",
+          "buildkite connector path `" + path + "` is configured by multiple bindings",
+        )
       }
       seen_paths[path] = true
     }
@@ -164,13 +168,21 @@ pub fn normalize_inbound(raw) {
   const payload = unwrap(parsed)
   const event = payload?.event ?? __header(headers, "x-buildkite-event")
   if event == nil || event == "" {
-    return __reject(400, "missing_event", "missing Buildkite event field and X-Buildkite-Event header")
+    return __reject(
+      400,
+      "missing_event",
+      "missing Buildkite event field and X-Buildkite-Event header",
+    )
   }
   if event == "ping" {
     return __reject(200, "ping", "buildkite webhook ping acknowledged")
   }
   if !contains(BUILDKITE_SUPPORTED_EVENTS, event) {
-    return __reject(400, "unsupported_event", "unsupported Buildkite event type `" + to_string(event) + "`")
+    return __reject(
+      400,
+      "unsupported_event",
+      "unsupported Buildkite event type `" + to_string(event) + "`",
+    )
   }
   const normalized = __build_event(event, payload, raw, headers, signature_status)
   return {type: "event", event: normalized}
@@ -180,7 +192,10 @@ pub fn normalize_inbound(raw) {
 /** Dispatch a supported Buildkite REST / GraphQL method. */
 pub fn call(method, args = {}) {
   if !contains(BUILDKITE_OUTBOUND_METHODS, method) {
-    return __err("method_not_found", "buildkite connector does not implement outbound method `" + method + "`")
+    return __err(
+      "method_not_found",
+      "buildkite connector does not implement outbound method `" + method + "`",
+    )
   }
   if method == "github_commit_pulls" {
     return __github_commit_pulls(args ?? {})
@@ -258,11 +273,17 @@ pub fn call(method, args = {}) {
       cfg,
     )
   }
-  return __buildkite_json("GET", __api_url(cfg.api_base_url, __build_path(unwrap(org), args)), nil, cfg)
+  return __buildkite_json(
+    "GET",
+    __api_url(cfg.api_base_url, __build_path(unwrap(org), args)),
+    nil,
+    cfg,
+  )
 }
 
 fn __state() {
-  return store_get(BUILDKITE_STATE_KEY) ?? {active: false, bindings: {}, ctx: {}, initialized: false}
+  return store_get(BUILDKITE_STATE_KEY)
+    ?? {active: false, bindings: {}, ctx: {}, initialized: false}
 }
 
 fn __set_state(state) {
@@ -288,7 +309,9 @@ fn __reject(status, code, message) {
 fn __reject_err(err) {
   const code = err?.code ?? "rejected"
   const message = err?.message ?? "request rejected"
-  const status = if code == "invalid_signature" || code == "invalid_token" || code == "missing_signature"
+  const status = if code == "invalid_signature" || code == "invalid_token"
+    || code
+    == "missing_signature"
     || code == "missing_token"
     || code == "missing_secret"
     || code == "stale_signature" {
@@ -321,7 +344,8 @@ fn __webhook_token(raw) {
   if binding_id != nil {
     const binding = bindings.get(binding_id)
     const binding_token = binding?.webhook_token ?? binding?.secrets?.webhook_token
-      ?? binding?.config?.webhook_token
+      ?? binding?.config
+      ?.webhook_token
     if binding_token != nil && trim(to_string(binding_token)) != "" {
       return to_string(binding_token)
     }
@@ -361,7 +385,8 @@ fn __webhook_token_id(raw) {
   if binding_id != nil {
     const binding = bindings.get(binding_id)
     const bid = binding?.webhook_token_id ?? binding?.secrets?.webhook_token_id
-      ?? binding?.config?.secret_ids?.webhook_token
+      ?? binding?.config
+      ?.secret_ids?.webhook_token
     if bid != nil && trim(to_string(bid)) != "" {
       return to_string(bid)
     }
@@ -384,7 +409,10 @@ fn __verify_webhook(raw, headers, body_text) {
   }
   const provided_token = __header(headers, "x-buildkite-token")
   if provided_token == nil || provided_token == "" {
-    return __err("missing_signature", "neither X-Buildkite-Signature nor X-Buildkite-Token header is present")
+    return __err(
+      "missing_signature",
+      "neither X-Buildkite-Signature nor X-Buildkite-Token header is present",
+    )
   }
   if !constant_time_eq(to_string(token), to_string(provided_token)) {
     return __err("invalid_token", "x-buildkite-token did not match the configured webhook token")
@@ -398,8 +426,14 @@ fn __verify_signature(raw, signature_header, body_text, token) {
   const timestamp = fields.get("timestamp")
   const signature = fields.get("signature")
   if timestamp == nil || trim(to_string(timestamp)) == "" || signature == nil
-    || trim(to_string(signature)) == "" {
-    return __err("invalid_signature", "x-buildkite-signature must contain `timestamp=<unix>,signature=<hex>`")
+    || trim(
+    to_string(signature),
+  )
+    == "" {
+    return __err(
+      "invalid_signature",
+      "x-buildkite-signature must contain `timestamp=<unix>,signature=<hex>`",
+    )
   }
   const signed_message = to_string(timestamp) + "." + body_text
   const expected = hmac_sha256(token, signed_message)
@@ -535,7 +569,8 @@ fn __job(job) {
 
 fn __org_from_pipeline(pipeline_obj) {
   const provider = pipeline_obj?.provider ?? {}
-  return provider?.settings?.account ?? pipeline_obj?.organization?.slug ?? pipeline_obj?.account_slug
+  return provider?.settings?.account ?? pipeline_obj?.organization?.slug
+    ?? pipeline_obj?.account_slug
 }
 
 @complexity(allow)
@@ -573,7 +608,9 @@ fn __pipeline_ref(args) {
 
 fn __build_path(org, args) {
   return "/organizations/" + url_encode(org) + "/pipelines/" + __pipeline_ref(args) + "/builds/"
-    + url_encode(to_string(args?.build_number ?? ""))
+    + url_encode(
+    to_string(args?.build_number ?? ""),
+  )
 }
 
 fn __upcase_method(method) {
@@ -582,16 +619,25 @@ fn __upcase_method(method) {
 
 @complexity(allow)
 fn __outbound_config(args) {
-  const api_base_url = args?.api_base_url ?? harness.env.get_or("BUILDKITE_API_BASE_URL", BUILDKITE_API_BASE_URL)
+  const api_base_url = args?.api_base_url
+    ?? harness.env.get_or(
+    "BUILDKITE_API_BASE_URL",
+    BUILDKITE_API_BASE_URL,
+  )
   const base_check = __validate_url_host(api_base_url, "api_base_url")
   if is_err(base_check) {
     return base_check
   }
   const api_token = args?.api_token ?? args?.access_token ?? args?.token ?? args?.secrets?.api_token
-    ?? harness.env.get("BUILDKITE_API_TOKEN")
+    ?? harness
+    .env
+    .get("BUILDKITE_API_TOKEN")
     ?? harness.env.get("BUILDKITE_TOKEN")
   if api_token == nil || trim(to_string(api_token)) == "" {
-    return __err("missing_token", "buildkite connector requires api_token (Bearer) for outbound calls")
+    return __err(
+      "missing_token",
+      "buildkite connector requires api_token (Bearer) for outbound calls",
+    )
   }
   return Ok({api_base_url: to_string(api_base_url), api_token: to_string(api_token)})
 }
@@ -680,7 +726,10 @@ fn __is_disallowed_host(host_lc) {
     return true
   }
   if ends_with(host_lc, ".localhost") || ends_with(host_lc, ".local")
-    || ends_with(host_lc, ".internal") {
+    || ends_with(
+    host_lc,
+    ".internal",
+  ) {
     return true
   }
   if host_lc == "::1" || host_lc == "0:0:0:0:0:0:0:1" {
@@ -733,7 +782,8 @@ fn __buildkite_json(method, url, body, cfg) {
     if is_err(limited) {
       return limited
     }
-    if (response.status == 429 || response.status == 503) && unwrap(limited) && !retried_rate_limit {
+    if (response.status == 429 || response.status == 503) && unwrap(limited)
+      && !retried_rate_limit {
       retried_rate_limit = true
       continue
     }
@@ -748,7 +798,8 @@ fn __buildkite_json(method, url, body, cfg) {
       return __err(
         code,
         "buildkite API request failed with status " + to_string(response.status) + ": "
-          + response.body,
+          + response
+          .body,
       )
     }
     return __decode_response(response)
@@ -804,7 +855,9 @@ fn __maybe_wait_for_rate_limit(response) {
 @complexity(allow)
 fn __graphql(args) {
   const api_token = args?.api_token ?? args?.access_token ?? args?.token
-    ?? harness.env.get("BUILDKITE_API_TOKEN")
+    ?? harness.env.get(
+    "BUILDKITE_API_TOKEN",
+  )
     ?? harness.env.get("BUILDKITE_TOKEN")
   if api_token == nil || trim(to_string(api_token)) == "" {
     return __err("missing_token", "buildkite graphql requires api_token (Bearer)")
@@ -851,7 +904,9 @@ fn __github_commit_pulls(args) {
   const url = __api_url(
     to_string(base),
     "/repos/" + url_encode(unwrap(owner)) + "/" + url_encode(unwrap(repo)) + "/commits/"
-      + url_encode(unwrap(sha))
+      + url_encode(
+      unwrap(sha),
+    )
       + "/pulls",
   )
   return __buildkite_json("GET", url, nil, {api_token: to_string(github_token)})

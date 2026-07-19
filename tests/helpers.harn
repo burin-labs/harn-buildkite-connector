@@ -61,7 +61,9 @@ pub fn assert_buildkite_interface() {
   assert(!read.requires_approval, "build.get does not require approval")
   const initialized = init({webhook_token: "test-secret"})
   assert(initialized.initialized, "init stores state")
-  const activated = activate([{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}])
+  const activated = activate(
+    [{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}],
+  )
   assert_eq(activated.bindings, 1, "activate counts bindings")
 }
 
