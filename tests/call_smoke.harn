@@ -141,7 +141,10 @@ pipeline default() {
   )
   assert_eq(pulls[0].number, 137, "github_commit_pulls resolves pr")
   // Missing api_token rejects.
-  const missing = call("build.get", {api_base_url: base, build_number: 43, org: org, pipeline: pipeline_slug})
+  const missing = call(
+    "build.get",
+    {api_base_url: base, build_number: 43, org: org, pipeline: pipeline_slug},
+  )
   assert(is_err(missing), "missing api token rejects")
   assert_eq(unwrap_err(missing).code, "missing_token", "missing token code")
   // Unsupported method rejects.
@@ -156,7 +159,10 @@ pipeline default() {
     {
       status: 429,
       body: "{\"message\":\"rate limited\"}",
-      headers: {"ratelimit-remaining": "0", "ratelimit-reset": to_string(to_int(harness.clock.timestamp()) + 120)},
+      headers: {
+        "ratelimit-remaining": "0",
+        "ratelimit-reset": to_string(to_int(harness.clock.timestamp()) + 120),
+      },
     },
   )
   const capped = call(

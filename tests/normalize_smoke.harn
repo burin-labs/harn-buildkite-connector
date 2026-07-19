@@ -27,7 +27,10 @@ pipeline default() {
   const tampered = buildkite_normalize(
     {
       body_text: tampered_body,
-      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, body, ts)},
+      headers: {
+        "x-buildkite-event": "build.finished",
+        "x-buildkite-signature": sign(token, body, ts),
+      },
     },
   )
   assert_eq(tampered.type, "reject", "tampered body rejected")
@@ -36,7 +39,10 @@ pipeline default() {
   const wrong = buildkite_normalize(
     {
       body_text: body,
-      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign("wrong-token", body, ts)},
+      headers: {
+        "x-buildkite-event": "build.finished",
+        "x-buildkite-signature": sign("wrong-token", body, ts),
+      },
     },
   )
   assert_eq(wrong.type, "reject", "wrong token rejected")
@@ -46,14 +52,19 @@ pipeline default() {
   const stale = buildkite_normalize(
     {
       body_text: body,
-      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, body, stale_ts)},
+      headers: {
+        "x-buildkite-event": "build.finished",
+        "x-buildkite-signature": sign(token, body, stale_ts),
+      },
     },
   )
   assert_eq(stale.type, "reject", "stale signature rejected")
   assert_eq(stale.reject.status, 401, "stale 401")
   // Fail closed: no token configured -> rejected.
   shutdown()
-  const unset = buildkite_normalize(fixture_raw("build_failed", "test-webhook-token", "build.finished"))
+  const unset = buildkite_normalize(
+    fixture_raw("build_failed", "test-webhook-token", "build.finished"),
+  )
   assert_eq(unset.type, "reject", "missing token fails closed")
   assert_eq(unset.reject.status, 401, "missing token 401")
   // Plain X-Buildkite-Token mode works as a simpler fallback.
@@ -82,7 +93,10 @@ pipeline default() {
   const invalid = buildkite_normalize(
     {
       body_text: bad_json,
-      headers: {"x-buildkite-event": "build.finished", "x-buildkite-signature": sign(token, bad_json, now_ts())},
+      headers: {
+        "x-buildkite-event": "build.finished",
+        "x-buildkite-signature": sign(token, bad_json, now_ts()),
+      },
     },
   )
   assert_eq(invalid.type, "reject", "invalid json rejected")
