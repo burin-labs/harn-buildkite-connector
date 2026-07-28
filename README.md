@@ -9,6 +9,8 @@ build.
 This is a first-party **inbound + outbound** connector package implementing
 Harn Connector Contract v1.
 
+Package version `0.1.0` supports Harn `>=0.10,<0.11`.
+
 ## User story
 
 Receive a failed-build webhook, map it to the PR, commit, and branch, then let
@@ -144,12 +146,28 @@ For REST helpers, scope the API token with `read_builds` for `build.get`,
 and unblock. GraphQL calls also require Buildkite's separate GraphQL API access
 capability; REST scopes do not limit GraphQL access.
 
+Create an organization webhook for `build.finished` and `job.finished` at
+`https://<public-host>/webhooks/buildkite`. Prefer timestamped HMAC signature
+mode, then store the webhook token and a dedicated API token:
+
+```sh
+harn connect api-key --connector buildkite \
+  --secret-id buildkite/webhook-token
+harn connect api-key --connector buildkite --secret-id buildkite/api-token \
+  --scopes read_builds,read_build_logs
+harn connect status --connector buildkite --json
+```
+
+Add `write_builds` only when approval-gated retries, rebuilds, cancels, or
+unblocks are enabled. Rotate each token independently: validate a new signed
+event and typed read before revoking the old value.
+
 ## Development
 
 Run the package gate:
 
 ```sh
-harn connector test "$(pwd)" --provider buildkite
+harn package verify . --provider buildkite
 ```
 
 ## License
