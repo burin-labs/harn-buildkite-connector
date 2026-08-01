@@ -2,12 +2,15 @@ import { init, shutdown } from "../src/lib"
 import { buildkite_normalize, fixture_raw } from "./helpers"
 
 @complexity(allow)
-pipeline default() {
+pipeline default(harness: Harness) {
   const token = "test-webhook-token"
-  shutdown()
-  init({webhook_token: token})
+  shutdown(harness)
+  init(harness, {webhook_token: token})
   // build.finished + passed -> build.passed, not a failure.
-  const passed = buildkite_normalize(fixture_raw("build_passed", token, "build.finished"))
+  const passed = buildkite_normalize(
+    harness,
+    fixture_raw(harness, "build_passed", token, "build.finished"),
+  )
   assert_eq(passed.type, "event", "passed envelope type")
   assert_eq(passed.event.kind, "build.passed", "passed kind")
   assert_eq(passed.event.signature_status.state, "verified", "passed signed")
@@ -28,7 +31,10 @@ pipeline default() {
   assert_eq(passed.event.payload.rerun_handle["pipeline"], "web", "passed rerun pipeline")
   assert_eq(passed.event.payload.rerun_handle.build_number, 42, "passed rerun build number")
   // build.finished + failed -> build.failed, is_failure true, pr_number from build.pull_request.
-  const failed = buildkite_normalize(fixture_raw("build_failed", token, "build.finished"))
+  const failed = buildkite_normalize(
+    harness,
+    fixture_raw(harness, "build_failed", token, "build.finished"),
+  )
   assert_eq(failed.event.kind, "build.failed", "failed kind")
   assert_eq(failed.event.payload.state, "failed", "failed state")
   assert_eq(failed.event.payload.is_failure, true, "failed is_failure")
@@ -46,7 +52,10 @@ pipeline default() {
   )
   assert(failed.event.payload.web_url != nil, "failed web_url present")
   // job.finished maps job details and surfaces rerun job_id.
-  const job = buildkite_normalize(fixture_raw("job_failed", token, "job.finished"))
+  const job = buildkite_normalize(
+    harness,
+    fixture_raw(harness, "job_failed", token, "job.finished"),
+  )
   assert_eq(job.event.kind, "job.finished", "job kind")
   assert_eq(job.event.payload.job.id, "j5555555-5555-5555-5555-555555555555", "job id")
   assert_eq(job.event.payload.job.exit_status, 1, "job exit status")
@@ -58,5 +67,5 @@ pipeline default() {
   // dedupe key is surfaced and stable on the (pipeline, build, event, state) tuple.
   assert_eq(failed.event.dedupe_key, "buildkite:web:43:build.finished:failed", "dedupe key tuple")
   assert(passed.event.dedupe_key != failed.event.dedupe_key, "distinct dedupe keys")
-  shutdown()
+  shutdown(harness)
 }
