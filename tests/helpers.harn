@@ -11,8 +11,8 @@ import {
 } from "../src/lib"
 
 /** Read a fixture JSON body from the test fixtures directory. */
-pub fn fixture_body(harness: HarnessFs, name) {
-  return harness.read_text(harness.source_dir() + "/fixtures/webhooks/" + name + ".json")
+pub fn fixture_body(fs: HarnessFs, name) {
+  return fs.read_text(fs.source_dir() + "/fixtures/webhooks/" + name + ".json")
 }
 
 /**
@@ -27,13 +27,13 @@ pub fn sign(token, body, timestamp) {
 }
 
 /** Current unix timestamp as an integer (within the freshness window). */
-pub fn now_ts(harness: HarnessClock) {
-  return to_int(harness.timestamp())
+pub fn now_ts(clock: HarnessClock) {
+  return to_int(clock.timestamp())
 }
 
 /** Build a raw inbound envelope signed with the X-Buildkite-Signature scheme. */
-pub fn signed_raw(harness: HarnessClock, token, body, event, timestamp = nil) {
-  const ts = timestamp ?? now_ts(harness)
+pub fn signed_raw(clock: HarnessClock, token, body, event, timestamp = nil) {
+  const ts = timestamp ?? now_ts(clock)
   return {
     body_text: body,
     headers: {"x-buildkite-event": event, "x-buildkite-signature": sign(token, body, ts)},
