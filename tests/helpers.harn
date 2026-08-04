@@ -11,8 +11,8 @@ import {
 } from "../src/lib"
 
 /** Read a fixture JSON body from the test fixtures directory. */
-pub fn fixture_body(harness: Harness, name) {
-  return harness.fs.read_text(harness.fs.source_dir() + "/fixtures/webhooks/" + name + ".json")
+pub fn fixture_body(harness: HarnessFs, name) {
+  return harness.read_text(harness.source_dir() + "/fixtures/webhooks/" + name + ".json")
 }
 
 /**
@@ -27,12 +27,12 @@ pub fn sign(token, body, timestamp) {
 }
 
 /** Current unix timestamp as an integer (within the freshness window). */
-pub fn now_ts(harness: Harness) {
-  return to_int(harness.clock.timestamp())
+pub fn now_ts(harness: HarnessClock) {
+  return to_int(harness.timestamp())
 }
 
 /** Build a raw inbound envelope signed with the X-Buildkite-Signature scheme. */
-pub fn signed_raw(harness: Harness, token, body, event, timestamp = nil) {
+pub fn signed_raw(harness: HarnessClock, token, body, event, timestamp = nil) {
   const ts = timestamp ?? now_ts(harness)
   return {
     body_text: body,
@@ -46,26 +46,32 @@ pub fn token_raw(token, body, event) {
 }
 
 /** Build a signed raw inbound envelope from a named fixture. */
-pub fn fixture_raw(harness: Harness, name, token, event, timestamp = nil) {
-  return signed_raw(harness, token, fixture_body(harness, name), event, timestamp)
+pub fn fixture_raw(
+  harness: {clock: HarnessClock, fs: HarnessFs},
+  name,
+  token,
+  event,
+  timestamp = nil,
+) {
+  return signed_raw(harness.clock, token, fixture_body(harness.fs, name), event, timestamp)
 }
 
 pub fn assert_buildkite_interface(harness: Harness) {
   shutdown(harness)
-  assert_eq(provider_id(), "buildkite", "provider id")
-  assert_eq(kinds()[0], "webhook", "webhook kind")
-  assert_eq(payload_schema().harn_schema_name, "BuildkiteEventPayload", "payload schema name")
+  expect_eq(provider_id(), "buildkite", "provider id")
+  expect_eq(kinds()[0], "webhook", "webhook kind")
+  expect_eq(payload_schema().harn_schema_name, "BuildkiteEventPayload", "payload schema name")
   const mutate = __method_meta(methods(), "job.retry")
-  assert(mutate.requires_approval, "job.retry requires approval")
+  expect(mutate.requires_approval, "job.retry requires approval")
   const read = __method_meta(methods(), "build.get")
-  assert(!read.requires_approval, "build.get does not require approval")
+  expect(!read.requires_approval, "build.get does not require approval")
   const initialized = init(harness, {webhook_token: "test-secret"})
-  assert(initialized.initialized, "init stores state")
+  expect(initialized.initialized, "init stores state")
   const activated = activate(
     harness,
     [{id: "primary", path: "/buildkite/events", secrets: {webhook_token: "test-secret"}}],
   )
-  assert_eq(activated.bindings, 1, "activate counts bindings")
+  expect_eq(activated.bindings, 1, "activate counts bindings")
 }
 
 fn __method_meta(method_list, name) {
@@ -83,4 +89,21 @@ pub fn buildkite_call(harness: Harness, method, args) {
 
 pub fn buildkite_normalize(harness: Harness, raw) {
   return normalize_inbound(harness, raw)
+}
+
+/**
+ * Require that a smoke-test condition holds. Helper `fn`s are not test
+ * pipelines, so `assert` does not belong here (HARN-LNT-025).
+ */
+fn expect(condition, message = "expectation failed") {
+  require condition, message
+}
+
+/** Require that two smoke-test values are equal, reporting both on failure. */
+fn expect_eq(actual, expected, message = "values differ") {
+  require actual == expected,
+    message + ": expected " + to_string(expected) + ", got "
+    + to_string(
+    actual,
+  )
 }

@@ -2,14 +2,14 @@ import { init, shutdown } from "../src/lib"
 import { buildkite_normalize, fixture_raw } from "./helpers"
 
 @complexity(allow)
-pipeline default(harness: Harness) {
+pipeline test_normalize_events(harness: Harness) {
   const token = "test-webhook-token"
   shutdown(harness)
   init(harness, {webhook_token: token})
   // build.finished + passed -> build.passed, not a failure.
   const passed = buildkite_normalize(
     harness,
-    fixture_raw(harness, "build_passed", token, "build.finished"),
+    fixture_raw({clock: harness.clock, fs: harness.fs}, "build_passed", token, "build.finished"),
   )
   assert_eq(passed.type, "event", "passed envelope type")
   assert_eq(passed.event.kind, "build.passed", "passed kind")
@@ -33,7 +33,7 @@ pipeline default(harness: Harness) {
   // build.finished + failed -> build.failed, is_failure true, pr_number from build.pull_request.
   const failed = buildkite_normalize(
     harness,
-    fixture_raw(harness, "build_failed", token, "build.finished"),
+    fixture_raw({clock: harness.clock, fs: harness.fs}, "build_failed", token, "build.finished"),
   )
   assert_eq(failed.event.kind, "build.failed", "failed kind")
   assert_eq(failed.event.payload.state, "failed", "failed state")
@@ -54,7 +54,7 @@ pipeline default(harness: Harness) {
   // job.finished maps job details and surfaces rerun job_id.
   const job = buildkite_normalize(
     harness,
-    fixture_raw(harness, "job_failed", token, "job.finished"),
+    fixture_raw({clock: harness.clock, fs: harness.fs}, "job_failed", token, "job.finished"),
   )
   assert_eq(job.event.kind, "job.finished", "job kind")
   assert_eq(job.event.payload.job.id, "j5555555-5555-5555-5555-555555555555", "job id")

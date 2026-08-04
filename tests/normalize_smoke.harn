@@ -10,22 +10,22 @@ import {
 } from "./helpers"
 
 @complexity(allow)
-pipeline default(harness: Harness) {
+pipeline test_normalize_smoke(harness: Harness) {
   const token = "test-webhook-token"
   assert_buildkite_interface(harness)
   shutdown(harness)
   init(harness, {webhook_token: token})
-  const body = fixture_body(harness, "build_failed")
+  const body = fixture_body(harness.fs, "build_failed")
   // Valid signature passes.
   const ok = buildkite_normalize(
     harness,
-    fixture_raw(harness, "build_failed", token, "build.finished"),
+    fixture_raw({clock: harness.clock, fs: harness.fs}, "build_failed", token, "build.finished"),
   )
   assert_eq(ok.type, "event", "valid signature accepted")
   assert_eq(ok.event.signature_status.state, "verified", "valid signature status")
   assert_eq(ok.event.signature_status.method, "signature", "valid signature method")
   // Tampered body -> signature no longer matches -> rejected 401.
-  const ts = now_ts(harness)
+  const ts = now_ts(harness.clock)
   const tampered_body = replace(body, "feature/login", "main")
   const tampered = buildkite_normalize(
     harness,
@@ -53,7 +53,7 @@ pipeline default(harness: Harness) {
   assert_eq(wrong.type, "reject", "wrong token rejected")
   assert_eq(wrong.reject.status, 401, "wrong token 401")
   // Stale timestamp (outside the 5-minute window) -> rejected even with a valid HMAC.
-  const stale_ts = now_ts(harness) - 600
+  const stale_ts = now_ts(harness.clock) - 600
   const stale = buildkite_normalize(
     harness,
     {
@@ -70,7 +70,12 @@ pipeline default(harness: Harness) {
   shutdown(harness)
   const unset = buildkite_normalize(
     harness,
-    fixture_raw(harness, "build_failed", "test-webhook-token", "build.finished"),
+    fixture_raw(
+      {clock: harness.clock, fs: harness.fs},
+      "build_failed",
+      "test-webhook-token",
+      "build.finished",
+    ),
   )
   assert_eq(unset.type, "reject", "missing token fails closed")
   assert_eq(unset.reject.status, 401, "missing token 401")
@@ -90,7 +95,7 @@ pipeline default(harness: Harness) {
       body_text: "{\"event\":\"ping\"}",
       headers: {
         "x-buildkite-event": "ping",
-        "x-buildkite-signature": sign(token, "{\"event\":\"ping\"}", now_ts(harness)),
+        "x-buildkite-signature": sign(token, "{\"event\":\"ping\"}", now_ts(harness.clock)),
       },
     },
   )
@@ -104,7 +109,7 @@ pipeline default(harness: Harness) {
       body_text: bad_json,
       headers: {
         "x-buildkite-event": "build.finished",
-        "x-buildkite-signature": sign(token, bad_json, now_ts(harness)),
+        "x-buildkite-signature": sign(token, bad_json, now_ts(harness.clock)),
       },
     },
   )
@@ -118,7 +123,7 @@ pipeline default(harness: Harness) {
       body_text: unsupported_body,
       headers: {
         "x-buildkite-event": "agent.connected",
-        "x-buildkite-signature": sign(token, unsupported_body, now_ts(harness)),
+        "x-buildkite-signature": sign(token, unsupported_body, now_ts(harness.clock)),
       },
     },
   )
