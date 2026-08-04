@@ -293,8 +293,8 @@ pub fn call(harness: Harness, method, args = {}) {
   )
 }
 
-fn __state(harness: HarnessRuntime) {
-  return harness.store_get(BUILDKITE_STATE_KEY)
+fn __state(runtime: HarnessRuntime) {
+  return runtime.store_get(BUILDKITE_STATE_KEY)
     ?? {
     active: false,
     bindings: {},
@@ -303,8 +303,8 @@ fn __state(harness: HarnessRuntime) {
   }
 }
 
-fn __set_state(harness: HarnessRuntime, state) {
-  harness.store_set(BUILDKITE_STATE_KEY, state)
+fn __set_state(runtime: HarnessRuntime, state) {
+  runtime.store_set(BUILDKITE_STATE_KEY, state)
   return state
 }
 
@@ -391,13 +391,13 @@ fn __webhook_token(harness: {secrets: HarnessSecrets, runtime: HarnessRuntime}, 
   return nil
 }
 
-fn __webhook_token_id(harness: HarnessRuntime, raw) {
+fn __webhook_token_id(runtime: HarnessRuntime, raw) {
   const metadata = raw?.metadata ?? {}
   const id = metadata?.secret_ids?.webhook_token ?? metadata?.config?.secret_ids?.webhook_token
   if id != nil && trim(to_string(id)) != "" {
     return to_string(id)
   }
-  const bindings = __state(harness).bindings ?? {}
+  const bindings = __state(runtime).bindings ?? {}
   const binding_id = metadata?.binding_id ?? raw?.binding_id
   if binding_id != nil {
     const binding = bindings.get(binding_id)
@@ -438,7 +438,7 @@ fn __verify_webhook(harness: Harness, raw, headers, body_text) {
 }
 
 @complexity(allow)
-fn __verify_signature(harness: HarnessClock, raw, signature_header, body_text, token) {
+fn __verify_signature(clock: HarnessClock, raw, signature_header, body_text, token) {
   const fields = __parse_signature_header(signature_header)
   const timestamp = fields.get("timestamp")
   const signature = fields.get("signature")
@@ -463,7 +463,7 @@ fn __verify_signature(harness: HarnessClock, raw, signature_header, body_text, t
   if is_err(parsed_ts) {
     return __err("invalid_signature", "x-buildkite-signature timestamp is not an integer")
   }
-  const now = __verification_timestamp(harness, raw)
+  const now = __verification_timestamp(clock, raw)
   const age = now - unwrap(parsed_ts)
   if age > SIGNATURE_MAX_AGE_SECONDS || age < -SIGNATURE_MAX_AGE_SECONDS {
     return __err(
@@ -475,7 +475,7 @@ fn __verify_signature(harness: HarnessClock, raw, signature_header, body_text, t
   return Ok("signed")
 }
 
-fn __verification_timestamp(harness: HarnessClock, raw) {
+fn __verification_timestamp(clock: HarnessClock, raw) {
   const received_at = raw?.received_at
   if received_at != nil && trim(to_string(received_at)) != "" {
     const parsed = try {
@@ -485,7 +485,7 @@ fn __verification_timestamp(harness: HarnessClock, raw) {
       return to_int(unwrap(parsed))
     }
   }
-  return to_int(harness.timestamp())
+  return to_int(clock.timestamp())
 }
 
 fn __parse_signature_header(header) {
@@ -635,9 +635,9 @@ fn __upcase_method(method) {
 }
 
 @complexity(allow)
-fn __outbound_config(harness: HarnessEnv, args) {
+fn __outbound_config(env: HarnessEnv, args) {
   const api_base_url = args?.api_base_url
-    ?? harness.get_or(
+    ?? env.get_or(
     "BUILDKITE_API_BASE_URL",
     BUILDKITE_API_BASE_URL,
   )
@@ -646,9 +646,9 @@ fn __outbound_config(harness: HarnessEnv, args) {
     return base_check
   }
   const api_token = args?.api_token ?? args?.access_token ?? args?.token ?? args?.secrets?.api_token
-    ?? harness
+    ?? env
     .get("BUILDKITE_API_TOKEN")
-    ?? harness.get("BUILDKITE_TOKEN")
+    ?? env.get("BUILDKITE_TOKEN")
   if api_token == nil || trim(to_string(api_token)) == "" {
     return __err(
       "missing_token",
@@ -843,7 +843,7 @@ fn __decode_response(response) {
 }
 
 @complexity(allow)
-fn __maybe_wait_for_rate_limit(harness: HarnessClock, response) {
+fn __maybe_wait_for_rate_limit(clock: HarnessClock, response) {
   const remaining = __header(response.headers ?? {}, "ratelimit-remaining")
   if remaining == nil || trim(to_string(remaining)) != "0" {
     return Ok(false)
@@ -858,12 +858,12 @@ fn __maybe_wait_for_rate_limit(harness: HarnessClock, response) {
   if is_err(parsed_reset) {
     return Ok(true)
   }
-  const wait_seconds = unwrap(parsed_reset) - to_int(harness.timestamp())
+  const wait_seconds = unwrap(parsed_reset) - to_int(clock.timestamp())
   if wait_seconds > 60 {
     return __err("rate_limited", "buildkite API rate limit reset is more than 60 seconds away")
   }
   if wait_seconds > 0 {
-    harness.sleep_ms(wait_seconds * 1000)
+    clock.sleep_ms(wait_seconds * 1000)
   }
   return Ok(true)
 }
