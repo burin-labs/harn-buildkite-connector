@@ -1,7 +1,7 @@
 import { call } from "../src/lib"
 
 @complexity(allow)
-pipeline default(harness: Harness) {
+pipeline test_call_smoke(harness: Harness) {
   harness.net.egress_policy(
     {allow: ["bk-api.test", "graphql.bk.test", "gh-api.test"], default: "deny"},
   )
