@@ -7,6 +7,14 @@ this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
+- Connector contract v2 with product-facing service metadata: the
+  manifest now declares all nine outbound Buildkite operations
+  (`build.get`, `job.log`, `job.retry`, `job.unblock`, `build.rebuild`,
+  `build.cancel`, `github_commit_pulls`, `graphql`, `api.request`) with
+  their capability, purpose, effect, evidence, and redaction semantics.
+  `graphql` and `api.request` are declared consequential because the
+  caller chooses the verb or document, so they cannot be projected as
+  read-only.
 - Initial pure-Harn Buildkite connector implementing the connector
   interface (`provider_id`, `kinds`, `methods`, `payload_schema`,
   lifecycle, `normalize_inbound`, `call`).
