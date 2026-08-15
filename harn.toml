@@ -14,6 +14,95 @@ id = "buildkite"
 connector = { harn = "src/lib.harn" }
 capabilities = ["webhook", "rate_limit", "pagination"]
 
+[providers.service]
+name = "Buildkite"
+description = "Inspects Buildkite builds and job logs, and retries failed work after review."
+
+[[providers.service.operations]]
+id = "build.get"
+capability = "builds.read"
+purpose = "Read the current state of one Buildkite build."
+effect = "read"
+environments = ["live"]
+evidence = ["current_provider_state"]
+redaction = ["error_body"]
+
+[[providers.service.operations]]
+id = "job.log"
+capability = "builds.logs.read"
+purpose = "Read one Buildkite job log to diagnose a failure."
+effect = "read"
+environments = ["live"]
+evidence = ["citation", "current_provider_state"]
+redaction = ["response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "job.retry"
+capability = "jobs.write"
+purpose = "Retry the exact Buildkite job reviewed by the user."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+reconciliation = "supported"
+redaction = ["request_body", "response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "job.unblock"
+capability = "jobs.write"
+purpose = "Unblock the exact Buildkite job reviewed by the user."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+reconciliation = "supported"
+redaction = ["request_body", "response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "build.rebuild"
+capability = "builds.write"
+purpose = "Rebuild the exact Buildkite build reviewed by the user."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+reconciliation = "supported"
+redaction = ["request_body", "response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "build.cancel"
+capability = "builds.write"
+purpose = "Cancel the exact Buildkite build reviewed by the user."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+reconciliation = "supported"
+redaction = ["request_body", "response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "github_commit_pulls"
+capability = "github.pull_requests.read"
+purpose = "Find the GitHub pull requests for a commit Buildkite built."
+effect = "read"
+environments = ["live"]
+evidence = ["current_provider_state"]
+redaction = ["error_body"]
+
+[[providers.service.operations]]
+id = "graphql"
+capability = "graphql.request"
+purpose = "Run the reviewed GraphQL document against the Buildkite API."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+redaction = ["request_body", "response_body", "error_body"]
+
+[[providers.service.operations]]
+id = "api.request"
+capability = "api.request"
+purpose = "Send the reviewed request to a Buildkite API path this connector does not model."
+effect = "consequential"
+environments = ["live"]
+evidence = ["user_confirmation", "current_provider_state"]
+redaction = ["request_body", "response_body", "error_body"]
+
 [providers.setup]
 auth_type = "api-key"
 flow = "api-key"
@@ -40,7 +129,7 @@ inaccessible_resource = "Confirm the token can access the target organization an
 transient_provider_outage = "Retry after the Buildkite API and webhook endpoints are healthy."
 
 [connector_contract]
-version = 1
+version = 2
 
 [[connector_contract.fixtures]]
 provider = "buildkite"
