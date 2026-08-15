@@ -7,6 +7,10 @@ this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
+- `credential_environment` binds `buildkite/api-token` to the
+  `BUILDKITE_TOKEN` environment variable, so a host that resolves
+  connector credentials from the process environment can find the
+  outbound Buildkite token instead of reporting it missing.
 - Connector contract v2 with product-facing service metadata: the
   manifest now declares all nine outbound Buildkite operations
   (`build.get`, `job.log`, `job.retry`, `job.unblock`, `build.rebuild`,
