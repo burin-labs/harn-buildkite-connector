@@ -295,12 +295,7 @@ pub fn call(harness: Harness, method, args = {}) {
 
 fn __state(runtime: HarnessRuntime) {
   return runtime.store_get(BUILDKITE_STATE_KEY)
-    ?? {
-    active: false,
-    bindings: {},
-    ctx: {},
-    initialized: false,
-  }
+    ?? {active: false, bindings: {}, ctx: {}, initialized: false}
 }
 
 fn __set_state(runtime: HarnessRuntime, state) {
@@ -328,7 +323,7 @@ fn __reject_err(err) {
   const message = err?.message ?? "request rejected"
   const status = if code == "invalid_signature" || code == "invalid_token"
     || code
-    == "missing_signature"
+      == "missing_signature"
     || code == "missing_token"
     || code == "missing_secret"
     || code == "stale_signature" {
@@ -361,8 +356,7 @@ fn __webhook_token(harness: {secrets: HarnessSecrets, runtime: HarnessRuntime}, 
   if binding_id != nil {
     const binding = bindings.get(binding_id)
     const binding_token = binding?.webhook_token ?? binding?.secrets?.webhook_token
-      ?? binding?.config
-      ?.webhook_token
+      ?? binding?.config?.webhook_token
     if binding_token != nil && trim(to_string(binding_token)) != "" {
       return to_string(binding_token)
     }
@@ -402,8 +396,7 @@ fn __webhook_token_id(runtime: HarnessRuntime, raw) {
   if binding_id != nil {
     const binding = bindings.get(binding_id)
     const bid = binding?.webhook_token_id ?? binding?.secrets?.webhook_token_id
-      ?? binding?.config
-      ?.secret_ids?.webhook_token
+      ?? binding?.config?.secret_ids?.webhook_token
     if bid != nil && trim(to_string(bid)) != "" {
       return to_string(bid)
     }
@@ -443,10 +436,8 @@ fn __verify_signature(clock: HarnessClock, raw, signature_header, body_text, tok
   const timestamp = fields.get("timestamp")
   const signature = fields.get("signature")
   if timestamp == nil || trim(to_string(timestamp)) == "" || signature == nil
-    || trim(
-    to_string(signature),
-  )
-    == "" {
+    || trim(to_string(signature))
+      == "" {
     return __err(
       "invalid_signature",
       "x-buildkite-signature must contain `timestamp=<unix>,signature=<hex>`",
@@ -625,9 +616,7 @@ fn __pipeline_ref(args) {
 
 fn __build_path(org, args) {
   return "/organizations/" + url_encode(org) + "/pipelines/" + __pipeline_ref(args) + "/builds/"
-    + url_encode(
-    to_string(args?.build_number ?? ""),
-  )
+    + url_encode(to_string(args?.build_number ?? ""))
 }
 
 fn __upcase_method(method) {
@@ -637,17 +626,13 @@ fn __upcase_method(method) {
 @complexity(allow)
 fn __outbound_config(env: HarnessEnv, args) {
   const api_base_url = args?.api_base_url
-    ?? env.get_or(
-    "BUILDKITE_API_BASE_URL",
-    BUILDKITE_API_BASE_URL,
-  )
+    ?? env.get_or("BUILDKITE_API_BASE_URL", BUILDKITE_API_BASE_URL)
   const base_check = __validate_url_host(api_base_url, "api_base_url")
   if is_err(base_check) {
     return base_check
   }
   const api_token = args?.api_token ?? args?.access_token ?? args?.token ?? args?.secrets?.api_token
-    ?? env
-    .get("BUILDKITE_API_TOKEN")
+    ?? env.get("BUILDKITE_API_TOKEN")
     ?? env.get("BUILDKITE_TOKEN")
   if api_token == nil || trim(to_string(api_token)) == "" {
     return __err(
@@ -742,10 +727,7 @@ fn __is_disallowed_host(host_lc) {
     return true
   }
   if ends_with(host_lc, ".localhost") || ends_with(host_lc, ".local")
-    || ends_with(
-    host_lc,
-    ".internal",
-  ) {
+    || ends_with(host_lc, ".internal") {
     return true
   }
   if host_lc == "::1" || host_lc == "0:0:0:0:0:0:0:1" {
@@ -814,8 +796,7 @@ fn __buildkite_json(harness: {clock: HarnessClock, net: HarnessNet}, method, url
       return __err(
         code,
         "buildkite API request failed with status " + to_string(response.status) + ": "
-          + response
-          .body,
+          + response.body,
       )
     }
     return __decode_response(response)
@@ -871,9 +852,7 @@ fn __maybe_wait_for_rate_limit(clock: HarnessClock, response) {
 @complexity(allow)
 fn __graphql(harness: Harness, args) {
   const api_token = args?.api_token ?? args?.access_token ?? args?.token
-    ?? harness.env.get(
-    "BUILDKITE_API_TOKEN",
-  )
+    ?? harness.env.get("BUILDKITE_API_TOKEN")
     ?? harness.env.get("BUILDKITE_TOKEN")
   if api_token == nil || trim(to_string(api_token)) == "" {
     return __err("missing_token", "buildkite graphql requires api_token (Bearer)")
@@ -921,9 +900,7 @@ fn __github_commit_pulls(harness: Harness, args) {
   const url = __api_url(
     to_string(base),
     "/repos/" + url_encode(unwrap(owner)) + "/" + url_encode(unwrap(repo)) + "/commits/"
-      + url_encode(
-      unwrap(sha),
-    )
+      + url_encode(unwrap(sha))
       + "/pulls",
   )
   return __buildkite_json(
