@@ -99,14 +99,14 @@ pub fn payload_schema() {
 }
 
 /** Initialize connector state with orchestrator context. */
-pub fn init(harness: Harness, ctx = nil) {
+pub fn init(harness: Harness, ctx: any = nil) {
   const next = __state(harness.runtime) + {initialized: true, ctx: ctx ?? {}}
   __set_state(harness.runtime, next)
   return next
 }
 
 /** Activate webhook bindings and reject duplicate configured paths. */
-pub fn activate(harness: Harness, bindings = []) {
+pub fn activate(harness: Harness, bindings: any = []) {
   let by_id = {}
   let seen_paths = {}
   for binding in bindings ?? [] {
@@ -148,7 +148,7 @@ pub fn shutdown(harness: Harness) {
  *
  * Fails closed when no webhook token is configured.
  */
-pub fn normalize_inbound(harness: Harness, raw) {
+pub fn normalize_inbound(harness: Harness, raw: any) {
   const body_text = raw?.body_text ?? raw?.body ?? ""
   if len(body_text) > MAX_BODY_BYTES {
     return __reject(413, "payload_too_large", "buildkite webhook body exceeds 1 MiB cap")
@@ -190,7 +190,7 @@ pub fn normalize_inbound(harness: Harness, raw) {
 
 @complexity(allow)
 /** Dispatch a supported Buildkite REST / GraphQL method. */
-pub fn call(harness: Harness, method, args = {}) {
+pub fn call(harness: Harness, method: any, args: any = {}) {
   if !contains(BUILDKITE_OUTBOUND_METHODS, method) {
     return __err(
       "method_not_found",
@@ -298,16 +298,16 @@ fn __state(runtime: HarnessRuntime) {
     ?? {active: false, bindings: {}, ctx: {}, initialized: false}
 }
 
-fn __set_state(runtime: HarnessRuntime, state) {
+fn __set_state(runtime: HarnessRuntime, state: any) {
   runtime.store_set(BUILDKITE_STATE_KEY, state)
   return state
 }
 
-fn __err(code, message) {
+fn __err(code: any, message: any) {
   return Err({code: code, message: message})
 }
 
-fn __reject(status, code, message) {
+fn __reject(status: any, code: any, message: any) {
   return {
     type: "reject",
     reject: {
@@ -318,7 +318,7 @@ fn __reject(status, code, message) {
   }
 }
 
-fn __reject_err(err) {
+fn __reject_err(err: any) {
   const code = err?.code ?? "rejected"
   const message = err?.message ?? "request rejected"
   const status = if code == "invalid_signature" || code == "invalid_token"
@@ -334,7 +334,7 @@ fn __reject_err(err) {
   return __reject(status, code, message)
 }
 
-fn __header(headers, name) {
+fn __header(headers: any, name: any) {
   const wanted = lowercase(name)
   for entry in (headers ?? {}).entries() {
     if lowercase(trim(to_string(entry.key))) == wanted {
@@ -345,7 +345,7 @@ fn __header(headers, name) {
 }
 
 @complexity(allow)
-fn __webhook_token(harness: {secrets: HarnessSecrets, runtime: HarnessRuntime}, raw) {
+fn __webhook_token(harness: {secrets: HarnessSecrets, runtime: HarnessRuntime}, raw: any) {
   const state = __state(harness.runtime)
   const ctx_token = state.ctx?.webhook_token ?? state.ctx?.secrets?.webhook_token
   if ctx_token != nil && trim(to_string(ctx_token)) != "" {
@@ -385,7 +385,7 @@ fn __webhook_token(harness: {secrets: HarnessSecrets, runtime: HarnessRuntime}, 
   return nil
 }
 
-fn __webhook_token_id(runtime: HarnessRuntime, raw) {
+fn __webhook_token_id(runtime: HarnessRuntime, raw: any) {
   const metadata = raw?.metadata ?? {}
   const id = metadata?.secret_ids?.webhook_token ?? metadata?.config?.secret_ids?.webhook_token
   if id != nil && trim(to_string(id)) != "" {
@@ -405,7 +405,7 @@ fn __webhook_token_id(runtime: HarnessRuntime, raw) {
 }
 
 @complexity(allow)
-fn __verify_webhook(harness: Harness, raw, headers, body_text) {
+fn __verify_webhook(harness: Harness, raw: any, headers: any, body_text: any) {
   const token = __webhook_token({secrets: harness.secrets, runtime: harness.runtime}, raw)
   if token == nil || trim(to_string(token)) == "" {
     return __err(
@@ -431,7 +431,13 @@ fn __verify_webhook(harness: Harness, raw, headers, body_text) {
 }
 
 @complexity(allow)
-fn __verify_signature(clock: HarnessClock, raw, signature_header, body_text, token) {
+fn __verify_signature(
+  clock: HarnessClock,
+  raw: any,
+  signature_header: any,
+  body_text: any,
+  token: any,
+) {
   const fields = __parse_signature_header(signature_header)
   const timestamp = fields.get("timestamp")
   const signature = fields.get("signature")
@@ -466,7 +472,7 @@ fn __verify_signature(clock: HarnessClock, raw, signature_header, body_text, tok
   return Ok("signed")
 }
 
-fn __verification_timestamp(clock: HarnessClock, raw) {
+fn __verification_timestamp(clock: HarnessClock, raw: any) {
   const received_at = raw?.received_at
   if received_at != nil && trim(to_string(received_at)) != "" {
     const parsed = try {
@@ -479,7 +485,7 @@ fn __verification_timestamp(clock: HarnessClock, raw) {
   return to_int(clock.timestamp())
 }
 
-fn __parse_signature_header(header) {
+fn __parse_signature_header(header: any) {
   let fields = {}
   for part in split(to_string(header), ",") {
     const trimmed = trim(part)
@@ -494,7 +500,7 @@ fn __parse_signature_header(header) {
 }
 
 @complexity(allow)
-fn __build_event(event, payload, raw, headers, signature_status) {
+fn __build_event(event: any, payload: any, raw: any, headers: any, signature_status: any) {
   const build = payload?.build ?? {}
   const pipeline_obj = payload?.pipeline ?? {}
   const job = payload?.job
@@ -529,7 +535,7 @@ fn __build_event(event, payload, raw, headers, signature_status) {
   }
 }
 
-fn __signature_status(status) {
+fn __signature_status(status: any) {
   if status == "signed" {
     return {method: "signature", state: "verified"}
   }
@@ -539,7 +545,7 @@ fn __signature_status(status) {
   return {state: "unsigned"}
 }
 
-fn __event_kind(event, build, job) {
+fn __event_kind(event: any, build: any, job: any) {
   if event == "build.finished" {
     const state = build?.state
     if state != nil && contains(BUILDKITE_FAILURE_STATES, to_string(state)) {
@@ -552,7 +558,7 @@ fn __event_kind(event, build, job) {
   return event
 }
 
-fn __pr_number(build) {
+fn __pr_number(build: any) {
   const pr = build?.pull_request
   if pr == nil {
     return nil
@@ -560,7 +566,7 @@ fn __pr_number(build) {
   return pr?.id ?? pr?.number
 }
 
-fn __job(job) {
+fn __job(job: any) {
   if job == nil {
     return nil
   }
@@ -575,14 +581,14 @@ fn __job(job) {
   }
 }
 
-fn __org_from_pipeline(pipeline_obj) {
+fn __org_from_pipeline(pipeline_obj: any) {
   const provider = pipeline_obj?.provider ?? {}
   return provider?.settings?.account ?? pipeline_obj?.organization?.slug
     ?? pipeline_obj?.account_slug
 }
 
 @complexity(allow)
-fn __dedupe_key(event, pipeline_slug, build) {
+fn __dedupe_key(event: any, pipeline_slug: any, build: any) {
   // Buildkite webhooks carry no per-delivery id, so dedup on the tuple that
   // uniquely identifies a build state transition.
   return "buildkite:" + to_string(pipeline_slug ?? "unknown") + ":" + to_string(build?.number ?? "")
@@ -592,7 +598,7 @@ fn __dedupe_key(event, pipeline_slug, build) {
     + to_string(build?.state ?? "")
 }
 
-fn __occurred_at(build, job, raw) {
+fn __occurred_at(build: any, job: any, raw: any) {
   if raw?.occurred_at != nil {
     return raw.occurred_at
   }
@@ -602,7 +608,7 @@ fn __occurred_at(build, job, raw) {
   return build?.finished_at ?? build?.started_at ?? build?.scheduled_at ?? build?.created_at
 }
 
-fn __require(args, key) {
+fn __require(args: any, key: any) {
   const value = args.get(key)
   if value == nil || trim(to_string(value)) == "" {
     return __err("missing_argument", "buildkite call requires `" + key + "`")
@@ -610,21 +616,21 @@ fn __require(args, key) {
   return Ok(to_string(value))
 }
 
-fn __pipeline_ref(args) {
+fn __pipeline_ref(args: any) {
   return url_encode(to_string(args?.pipeline ?? args?.pipeline_slug ?? ""))
 }
 
-fn __build_path(org, args) {
+fn __build_path(org: any, args: any) {
   return "/organizations/" + url_encode(org) + "/pipelines/" + __pipeline_ref(args) + "/builds/"
     + url_encode(to_string(args?.build_number ?? ""))
 }
 
-fn __upcase_method(method) {
+fn __upcase_method(method: any) {
   return uppercase(trim(to_string(method)))
 }
 
 @complexity(allow)
-fn __outbound_config(env: HarnessEnv, args) {
+fn __outbound_config(env: HarnessEnv, args: any) {
   const api_base_url = args?.api_base_url
     ?? env.get_or("BUILDKITE_API_BASE_URL", BUILDKITE_API_BASE_URL)
   const base_check = __validate_url_host(api_base_url, "api_base_url")
@@ -643,7 +649,7 @@ fn __outbound_config(env: HarnessEnv, args) {
   return Ok({api_base_url: to_string(api_base_url), api_token: to_string(api_token)})
 }
 
-fn __api_url(api_base_url, path) {
+fn __api_url(api_base_url: any, path: any) {
   const base = trim(to_string(api_base_url))
   const prefix = if ends_with(base, "/") {
     base[0:len(base) - 1]
@@ -660,7 +666,7 @@ fn __api_url(api_base_url, path) {
 }
 
 @complexity(allow)
-fn __validate_url_host(url_value, label) {
+fn __validate_url_host(url_value: any, label: any) {
   if url_value == nil || trim(to_string(url_value)) == "" {
     return __err("invalid_url", label + " is required")
   }
@@ -690,7 +696,7 @@ fn __validate_url_host(url_value, label) {
   return Ok(true)
 }
 
-fn __strip_port(host_port) {
+fn __strip_port(host_port: any) {
   if starts_with(host_port, "[") {
     const close = __index_of(host_port, "]")
     if close >= 0 {
@@ -705,7 +711,7 @@ fn __strip_port(host_port) {
   return host_port
 }
 
-fn __index_of(text, needle) {
+fn __index_of(text: any, needle: any) {
   const n = len(text)
   const m = len(needle)
   if m == 0 {
@@ -722,7 +728,7 @@ fn __index_of(text, needle) {
 }
 
 @complexity(allow)
-fn __is_disallowed_host(host_lc) {
+fn __is_disallowed_host(host_lc: any) {
   if host_lc == "localhost" {
     return true
   }
@@ -758,7 +764,13 @@ fn __is_disallowed_host(host_lc) {
 }
 
 @complexity(allow)
-fn __buildkite_json(harness: {clock: HarnessClock, net: HarnessNet}, method, url, body, cfg) {
+fn __buildkite_json(
+  harness: {clock: HarnessClock, net: HarnessNet},
+  method: any,
+  url: any,
+  body: any,
+  cfg: any,
+) {
   let options = {
     headers: {Accept: "application/json", Authorization: "Bearer " + cfg.api_token},
     retry: {backoff_ms: 0, max: 0},
@@ -803,7 +815,7 @@ fn __buildkite_json(harness: {clock: HarnessClock, net: HarnessNet}, method, url
   }
 }
 
-fn __decode_response(response) {
+fn __decode_response(response: any) {
   if trim(response.body ?? "") == "" {
     return {body: "", headers: response.headers, status: response.status}
   }
@@ -824,7 +836,7 @@ fn __decode_response(response) {
 }
 
 @complexity(allow)
-fn __maybe_wait_for_rate_limit(clock: HarnessClock, response) {
+fn __maybe_wait_for_rate_limit(clock: HarnessClock, response: any) {
   const remaining = __header(response.headers ?? {}, "ratelimit-remaining")
   if remaining == nil || trim(to_string(remaining)) != "0" {
     return Ok(false)
@@ -850,7 +862,7 @@ fn __maybe_wait_for_rate_limit(clock: HarnessClock, response) {
 }
 
 @complexity(allow)
-fn __graphql(harness: Harness, args) {
+fn __graphql(harness: Harness, args: any) {
   const api_token = args?.api_token ?? args?.access_token ?? args?.token
     ?? harness.env.get("BUILDKITE_API_TOKEN")
     ?? harness.env.get("BUILDKITE_TOKEN")
@@ -875,7 +887,7 @@ fn __graphql(harness: Harness, args) {
 }
 
 @complexity(allow)
-fn __github_commit_pulls(harness: Harness, args) {
+fn __github_commit_pulls(harness: Harness, args: any) {
   const owner = __require(args, "owner")
   if is_err(owner) {
     return owner
