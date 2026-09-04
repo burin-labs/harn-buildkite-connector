@@ -7,7 +7,7 @@ import {
   now_ts,
   sign,
   token_raw,
-} from "./helpers"
+} from "../testdata/helpers"
 
 @complexity(allow)
 pipeline test_normalize_smoke(harness: Harness) {

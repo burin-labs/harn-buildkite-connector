@@ -1,5 +1,5 @@
 import { init, shutdown } from "../src/lib"
-import { buildkite_normalize, fixture_raw } from "./helpers"
+import { buildkite_normalize, fixture_raw } from "../testdata/helpers"
 
 @complexity(allow)
 pipeline test_normalize_events(harness: Harness) {
