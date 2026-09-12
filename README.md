@@ -9,7 +9,7 @@ build.
 This is a first-party **inbound + outbound** connector package implementing
 Harn Connector Contract v1.
 
-Package version `0.1.0` supports Harn `>=0.10,<0.11`.
+Package version `0.1.0` supports Harn `>=0.10.135,<0.11`.
 
 ## User story
 
