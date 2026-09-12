@@ -5,6 +5,10 @@ this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+### Changed
+
+- Require Harn 0.10.135 and use typed capability projections in the connector and fixtures.
+
 ### Added
 
 - `credential_environment` binds `buildkite/api-token` to the

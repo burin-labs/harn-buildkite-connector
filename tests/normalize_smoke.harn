@@ -19,7 +19,7 @@ pipeline test_normalize_smoke(harness: Harness) {
   // Valid signature passes.
   const ok = buildkite_normalize(
     harness,
-    fixture_raw({clock: harness.clock, fs: harness.fs}, "build_failed", token, "build.finished"),
+    fixture_raw(pick(harness, ["clock", "fs"]), "build_failed", token, "build.finished"),
   )
   assert_eq(ok.type, "event", "valid signature accepted")
   assert_eq(ok.event.signature_status.state, "verified", "valid signature status")
@@ -71,7 +71,7 @@ pipeline test_normalize_smoke(harness: Harness) {
   const unset = buildkite_normalize(
     harness,
     fixture_raw(
-      {clock: harness.clock, fs: harness.fs},
+      pick(harness, ["clock", "fs"]),
       "build_failed",
       "test-webhook-token",
       "build.finished",

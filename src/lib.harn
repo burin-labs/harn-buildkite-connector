@@ -212,7 +212,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
     const http_method = __upcase_method(args?.method ?? "GET")
     const path = to_string(args?.path ?? "")
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       http_method,
       __api_url(cfg.api_base_url, path),
       args?.body,
@@ -225,7 +225,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   }
   if method == "job.log" {
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       "GET",
       __api_url(
         cfg.api_base_url,
@@ -242,7 +242,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   }
   if method == "job.retry" {
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       "PUT",
       __api_url(
         cfg.api_base_url,
@@ -255,7 +255,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   }
   if method == "job.unblock" {
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       "PUT",
       __api_url(
         cfg.api_base_url,
@@ -268,7 +268,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   }
   if method == "build.rebuild" {
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       "PUT",
       __api_url(cfg.api_base_url, __build_path(unwrap(org), args) + "/rebuild"),
       nil,
@@ -277,7 +277,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   }
   if method == "build.cancel" {
     return __buildkite_json(
-      {clock: harness.clock, net: harness.net},
+      pick(harness, ["clock", "net"]),
       "PUT",
       __api_url(cfg.api_base_url, __build_path(unwrap(org), args) + "/cancel"),
       nil,
@@ -285,7 +285,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
     )
   }
   return __buildkite_json(
-    {clock: harness.clock, net: harness.net},
+    pick(harness, ["clock", "net"]),
     "GET",
     __api_url(cfg.api_base_url, __build_path(unwrap(org), args)),
     nil,
@@ -406,7 +406,7 @@ fn __webhook_token_id(runtime: HarnessRuntime, raw: any) {
 
 @complexity(allow)
 fn __verify_webhook(harness: Harness, raw: any, headers: any, body_text: any) {
-  const token = __webhook_token({secrets: harness.secrets, runtime: harness.runtime}, raw)
+  const token = __webhook_token(pick(harness, ["secrets", "runtime"]), raw)
   if token == nil || trim(to_string(token)) == "" {
     return __err(
       "missing_secret",
@@ -878,7 +878,7 @@ fn __graphql(harness: Harness, args: any) {
     return base_check
   }
   return __buildkite_json(
-    {clock: harness.clock, net: harness.net},
+    pick(harness, ["clock", "net"]),
     "POST",
     to_string(url),
     {query: to_string(args.query), variables: args?.variables ?? {}},
@@ -916,7 +916,7 @@ fn __github_commit_pulls(harness: Harness, args: any) {
       + "/pulls",
   )
   return __buildkite_json(
-    {clock: harness.clock, net: harness.net},
+    pick(harness, ["clock", "net"]),
     "GET",
     url,
     nil,
