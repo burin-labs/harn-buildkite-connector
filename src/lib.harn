@@ -1,3 +1,5 @@
+import { connector_http_request } from "std/connectors/http"
+
 const BUILDKITE_PROVIDER_ID = "buildkite"
 
 const BUILDKITE_STATE_KEY = "harn-buildkite-connector.state"
@@ -251,6 +253,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
       ),
       nil,
       cfg,
+      1,
     )
   }
   if method == "job.unblock" {
@@ -264,6 +267,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
       ),
       args?.body,
       cfg,
+      1,
     )
   }
   if method == "build.rebuild" {
@@ -273,6 +277,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
       __api_url(cfg.api_base_url, __build_path(unwrap(org), args) + "/rebuild"),
       nil,
       cfg,
+      1,
     )
   }
   if method == "build.cancel" {
@@ -282,6 +287,7 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
       __api_url(cfg.api_base_url, __build_path(unwrap(org), args) + "/cancel"),
       nil,
       cfg,
+      1,
     )
   }
   return __buildkite_json(
@@ -770,49 +776,42 @@ fn __buildkite_json(
   url: any,
   body: any,
   cfg: any,
+  max_attempts: int = 2,
 ) {
   let options = {
     headers: {Accept: "application/json", Authorization: "Bearer " + cfg.api_token},
-    retry: {backoff_ms: 0, max: 0},
+    retry_policy: {max_attempts: max_attempts, base_ms: 0, cap_ms: 60000, retry_on: [429, 503]},
+    quota: {
+      remaining_header: "RateLimit-Remaining",
+      reset_header: "RateLimit-Reset",
+      reset_is_epoch: true,
+    },
   }
   if body != nil {
     options["body"] = json_stringify(body)
     options.headers["Content-Type"] = "application/json"
   }
-  let retried_rate_limit = false
-  while true {
-    const response_result = try {
-      harness.net.request(method, url, options)
+  const response = connector_http_request(harness.clock, harness.net, method, url, options)
+  if !(response.ok ?? false) {
+    const status = response.status ?? response.error?.status
+    const code = if response.error?.category == "rate_limit" || status == 429 || status == 503 {
+      "rate_limited"
+    } else if status == 401 || status == 403 {
+      "unauthorized"
+    } else {
+      "transport"
     }
-    if is_err(response_result) {
-      return __err("transport", to_string(unwrap_err(response_result)))
-    }
-    const response = unwrap(response_result)
-    const limited = __maybe_wait_for_rate_limit(harness.clock, response)
-    if is_err(limited) {
-      return limited
-    }
-    if (response.status == 429 || response.status == 503) && unwrap(limited)
-      && !retried_rate_limit {
-      retried_rate_limit = true
-      continue
-    }
-    if response.status < 200 || response.status >= 300 {
-      const code = if response.status == 429 || response.status == 503 {
-        "rate_limited"
-      } else if response.status == 401 || response.status == 403 {
-        "unauthorized"
-      } else {
-        "transport"
-      }
-      return __err(
-        code,
-        "buildkite API request failed with status " + to_string(response.status) + ": "
-          + response.body,
+    const message = if status == nil {
+      to_string(
+        response.error?.message ?? response.error?.category ?? "Buildkite API request failed",
       )
+    } else {
+      "buildkite API request failed with status " + to_string(status) + ": "
+        + to_string(response.body ?? "")
     }
-    return __decode_response(response)
+    return __err(code, message)
   }
+  return __decode_response(response)
 }
 
 fn __decode_response(response: any) {
@@ -836,31 +835,6 @@ fn __decode_response(response: any) {
 }
 
 @complexity(allow)
-fn __maybe_wait_for_rate_limit(clock: HarnessClock, response: any) {
-  const remaining = __header(response.headers ?? {}, "ratelimit-remaining")
-  if remaining == nil || trim(to_string(remaining)) != "0" {
-    return Ok(false)
-  }
-  const reset = __header(response.headers ?? {}, "ratelimit-reset")
-  if reset == nil || trim(to_string(reset)) == "" {
-    return Ok(true)
-  }
-  const parsed_reset = try {
-    to_int(reset)
-  }
-  if is_err(parsed_reset) {
-    return Ok(true)
-  }
-  const wait_seconds = unwrap(parsed_reset) - to_int(clock.timestamp())
-  if wait_seconds > 60 {
-    return __err("rate_limited", "buildkite API rate limit reset is more than 60 seconds away")
-  }
-  if wait_seconds > 0 {
-    clock.sleep_ms(wait_seconds * 1000)
-  }
-  return Ok(true)
-}
-
 @complexity(allow)
 fn __graphql(harness: Harness, args: any) {
   const api_token = args?.api_token ?? args?.access_token ?? args?.token
