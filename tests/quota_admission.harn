@@ -1,0 +1,57 @@
+import { call } from "../src/lib"
+
+pipeline test_buildkite_quota_uses_shared_http(harness: Harness) {
+  harness.net.egress_policy({allow: ["bk-api.test"], default: "deny"})
+  const base = "https://bk-api.test/v2"
+  const build_url = base + "/organizations/acme/pipelines/web/builds/43"
+  const args = {
+    api_base_url: base,
+    api_token: "buildkite-api-token",
+    build_number: 43,
+    org: "acme",
+    pipeline: "web",
+  }
+  harness.testing.clock_set(1000000)
+  harness.testing.http_mock_clear()
+  harness.testing.http_mock(
+    "GET",
+    build_url,
+    {
+      status: 200,
+      body: "{\"number\":43}",
+      headers: {"ratelimit-remaining": "0", "ratelimit-reset": "1002"},
+    },
+  )
+  assert_eq(call(harness, "build.get", args).number, 43)
+  assert_eq(harness.clock.now_ms() - 1000000, 2000, "successful quota wait")
+  assert_eq(len(harness.testing.http_mock_calls()), 1, "successful response sent once")
+  harness.testing.http_mock_clear()
+  harness.testing.http_mock(
+    "GET",
+    build_url,
+    {
+      responses: [
+        {status: 429, body: "limited", headers: {"ratelimit-remaining": "0"}},
+        {status: 200, body: "{\"number\":43}"},
+      ],
+    },
+  )
+  assert_eq(call(harness, "build.get", args).number, 43)
+  assert_eq(len(harness.testing.http_mock_calls()), 2, "read retries once")
+  harness.testing.http_mock_clear()
+  harness.testing.http_mock(
+    "PUT",
+    build_url + "/jobs/j1/retry",
+    {
+      responses: [
+        {status: 429, body: "limited", headers: {"ratelimit-remaining": "0"}},
+        {status: 200, body: "{\"id\":\"j2\"}"},
+      ],
+    },
+  )
+  const retry_result = call(harness, "job.retry", args + {job_id: "j1"})
+  assert(is_err(retry_result), "a single-use job retry cannot be duplicated")
+  assert_eq(unwrap_err(retry_result).code, "rate_limited")
+  assert_eq(len(harness.testing.http_mock_calls()), 1, "single-use job retry sent once")
+  harness.testing.clock_reset()
+}
