@@ -7,6 +7,9 @@ this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Changed
 
+- Share lifecycle state handling with Harn while preserving initialization,
+  activation, refusal, and shutdown responses.
+
 - Require Harn 0.10.135 and use typed capability projections in the connector and fixtures.
 
 ### Added

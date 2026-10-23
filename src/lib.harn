@@ -1,8 +1,18 @@
 import { connector_http_request } from "std/connectors/http"
+import { connector_lifecycle } from "std/connectors/shared"
 
 const BUILDKITE_PROVIDER_ID = "buildkite"
 
 const BUILDKITE_STATE_KEY = "harn-buildkite-connector.state"
+
+const lifecycle = connector_lifecycle(BUILDKITE_PROVIDER_ID, BUILDKITE_STATE_KEY)
+
+/** Saved bindings and caller context returned by initialization. */
+pub type LifecycleState = {initialized: bool, active: bool, bindings: dict<string, dict>, ctx: any}
+
+/** Webhook binding count on success, or an activation error. */
+pub type Activation = {provider: string, kind: string, bindings: int} \
+  | Result<nil, {code: string, message: string}>
 
 const BUILDKITE_API_BASE_URL = "https://api.buildkite.com/v2"
 
@@ -101,40 +111,22 @@ pub fn payload_schema() {
 }
 
 /** Initialize connector state with orchestrator context. */
-pub fn init(harness: Harness, ctx: any = nil) {
-  const next = __state(harness.runtime) + {initialized: true, ctx: ctx ?? {}}
-  __set_state(harness.runtime, next)
-  return next
+pub fn init(harness: Harness, ctx: any = nil) -> LifecycleState {
+  return lifecycle.init(harness.runtime, ctx)
 }
 
 /** Activate webhook bindings and reject duplicate configured paths. */
-pub fn activate(harness: Harness, bindings: any = []) {
-  let by_id = {}
-  let seen_paths = {}
-  for binding in bindings ?? [] {
-    const binding_id = binding?.binding_id ?? binding?.id
-      ?? "binding-" + to_string(len(by_id.keys()))
-    const path = binding?.path ?? binding?.match?.path
-    if path != nil && path != "" {
-      if seen_paths.get(path) {
-        return __err(
-          "activation",
-          "buildkite connector path `" + path + "` is configured by multiple bindings",
-        )
-      }
-      seen_paths[path] = true
-    }
-    by_id[binding_id] = binding + {binding_id: binding_id}
+pub fn activate(harness: Harness, bindings: any = []) -> Activation {
+  const activated = lifecycle.activate(harness.runtime, bindings)
+  if is_err(activated) {
+    return activated
   }
-  const next = __state(harness.runtime) + {active: true, bindings: by_id}
-  __set_state(harness.runtime, next)
-  return {bindings: len(by_id.keys()), kind: "webhook", provider: BUILDKITE_PROVIDER_ID}
+  return activated + {kind: "webhook"}
 }
 
 /** Clear connector lifecycle state. */
-pub fn shutdown(harness: Harness) {
-  harness.runtime.store_delete(BUILDKITE_STATE_KEY)
-  return {active: false, provider: BUILDKITE_PROVIDER_ID}
+pub fn shutdown(harness: Harness) -> {provider: string, active: bool} {
+  return lifecycle.shutdown(harness.runtime)
 }
 
 @complexity(allow)
@@ -299,14 +291,8 @@ pub fn call(harness: Harness, method: any, args: any = {}) {
   )
 }
 
-fn __state(runtime: HarnessRuntime) {
-  return runtime.store_get(BUILDKITE_STATE_KEY)
-    ?? {active: false, bindings: {}, ctx: {}, initialized: false}
-}
-
-fn __set_state(runtime: HarnessRuntime, state: any) {
-  runtime.store_set(BUILDKITE_STATE_KEY, state)
-  return state
+fn __state(runtime: HarnessRuntime) -> LifecycleState {
+  return lifecycle.state(runtime)
 }
 
 fn __err(code: any, message: any) {
